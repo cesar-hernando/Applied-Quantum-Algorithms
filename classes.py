@@ -89,3 +89,5 @@ class Antiferromagnetic_2D:
         hamiltonian = qml.Hamiltonian(coef, ops)
 
         return hamiltonian
+    
+    
