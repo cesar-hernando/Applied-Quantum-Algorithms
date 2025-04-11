@@ -8,15 +8,15 @@ In this file, we train a Machine Learning (ML) model to learn to predict propert
 import numpy as np
 import matplotlib.pyplot as plt
 import pennylane as qml
-import functions
+import classes
 
 # Compute the Hamiltonian of the 2D antiferromagnetic system of 9 qubits
 
 n = 2
-qubit_coord = [(i,j) for i in range(n) for j in range(n)]
-J_right, J_down = functions.generate_couplings(n)
-H = functions.hamiltonian(n, qubit_coord, J_right, J_down)
-H_matrix = qml.matrix(H)
+antiferromagnetic_2D = classes.Antiferromagnetic_2D(n)
+H = antiferromagnetic_2D.hamiltonian()
+H_mat = qml.matrix(H)
+print(H_mat.shape)
 
 
 
