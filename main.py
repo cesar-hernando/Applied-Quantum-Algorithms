@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pennylane as qml
 import functions
+from lasso import lasso_regression
 
 mode = 'training'
 
@@ -34,12 +35,24 @@ elif mode == 'training':
     num_examples = 1000
     obs_name = 'corr01'
 
-    X, Y = functions.generate_training_set(n, num_examples, obs_name)
-    plt.figure()
-    plt.plot(range(len(Y)), Y)
-    plt.xlabel('Coupling random realization')
-    plt.ylabel(f'Expectarion value of {obs_name}')
-    plt.show()
+    X, y = functions.generate_training_set(n, num_examples, obs_name)
+
+    verbose = False
+    if verbose:
+        plt.figure()
+        plt.plot(range(len(Y)), Y)
+        plt.xlabel('Coupling random realization')
+        plt.ylabel(f'Expectarion value of {obs_name}')
+        plt.show()
+
+    # Train the model classically (generation of expectation values classically) and with LASSO regression
+
+    coefficients, L1_norm_coef, optimal_alpha, train_mse, test_mse, train_r2, test_r2 = lasso_regression(X, y)
+    print(f'Coefficients (omega)= {coefficients}')
+    print(f'L1 norm of omega = {L1_norm_coef}')
+    print(f"Optimal alpha: {optimal_alpha}")
+    print(f'MSE: training -> {train_mse}; test -> {test_mse}')
+    print(f'R^2: training -> {train_r2}; test -> {test_r2}')
 
 
 
