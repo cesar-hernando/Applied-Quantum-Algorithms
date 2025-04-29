@@ -15,32 +15,32 @@ mode = 'training'
 
 if mode == 'basic_test':
     # Set the number of qubits in each row/column of the square grid
-    n = 2
+    dim_grid = (2,5)
 
     # Generate the coupling coefficients
-    J_right, J_down = functions.generate_couplings(n)
+    J_right, J_down = functions.generate_couplings(dim_grid)
 
     # Obtain the Hamiltonian (qml.Hamiltonian) of the 2D Antiferromagnetic lattice
-    H = functions.hamiltonian(n, J_right, J_down)
+    H = functions.hamiltonian(dim_grid, J_right, J_down)
 
     # Define the observable
     correlation_01 = functions.observable('corr01')
 
     # Calculate the ground state expectation value of the observable
-    exp_val_corr_01 = functions.ground_state_expectation_value(n, H, correlation_01)
+    exp_val_corr_01 = functions.ground_state_expectation_value(dim_grid, H, correlation_01)
     print(f"Expectation value of the correlation of qubits 0 and 1 = {exp_val_corr_01}")
 
 elif mode == 'training':
-    n = 2
+    dim_grid = (2,5)
     num_examples = 1000
     obs_name = 'corr01'
 
-    X, y = functions.generate_training_set(n, num_examples, obs_name)
+    X, y = functions.generate_training_set(dim_grid, num_examples, obs_name)
 
     verbose = False
     if verbose:
         plt.figure()
-        plt.plot(range(len(Y)), Y)
+        plt.plot(range(len(y)), y)
         plt.xlabel('Coupling random realization')
         plt.ylabel(f'Expectarion value of {obs_name}')
         plt.show()
