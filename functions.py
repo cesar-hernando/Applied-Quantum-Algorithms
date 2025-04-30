@@ -105,7 +105,9 @@ def observable(obs_name):
     if obs_name == 'corr01':
         # Define the observable to measure: the correlation function between qubits 0 and 1
         coefs = (1/3)*np.ones(3)
-        ops = [qml.PauliX(0) @ qml.PauliX(1), qml.PauliY(0) @ qml.PauliY(1), qml.PauliZ(0) @ qml.PauliZ(1)]
+        i0 = str((0,0))
+        i1 = str((0,1))
+        ops = [qml.PauliX(i0) @ qml.PauliX(i1), qml.PauliY(i0) @ qml.PauliY(i1), qml.PauliZ(i0) @ qml.PauliZ(i1)]
         observable = qml.Hamiltonian(coefs, ops)
     
     return observable
@@ -134,8 +136,9 @@ def ground_state_expectation_value(dim_grid, hamiltonian, observable):
     '''
      
     # Transform the qml.Hamiltonian objects to np matrices
-    H_matrix = qml.matrix(hamiltonian)
-    obs_matrix = qml.matrix(observable, wire_order=[i for i in range(dim_grid[0]*dim_grid[1])])
+    wires = [str((i, j)) for i in range(dim_grid[0]) for j in range(dim_grid[1])]
+    H_matrix = qml.matrix(hamiltonian, wire_order=wires)
+    obs_matrix = qml.matrix(observable, wire_order=wires)
 
     # Diagonalize the Hamiltonian to find the ground state
     eigenvalues, eigenvectors = np.linalg.eigh(H_matrix)

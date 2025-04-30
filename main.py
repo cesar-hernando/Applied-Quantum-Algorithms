@@ -10,8 +10,9 @@ import matplotlib.pyplot as plt
 import pennylane as qml
 import functions
 from lasso import lasso_regression
+from SA_VQE import SA_VQE_expec_val
 
-mode = 'training'
+mode = 'basic_test'
 
 if mode == 'basic_test':
     # Set the number of qubits in each row/column of the square grid
@@ -19,16 +20,22 @@ if mode == 'basic_test':
 
     # Generate the coupling coefficients
     J_right, J_down = functions.generate_couplings(dim_grid)
-
+    print('Couplings generated')
     # Obtain the Hamiltonian (qml.Hamiltonian) of the 2D Antiferromagnetic lattice
     H = functions.hamiltonian(dim_grid, J_right, J_down)
-
+    print('Hamiltonian generated')
     # Define the observable
     correlation_01 = functions.observable('corr01')
+    print('Observable generated')
+    # Obtain ground state property by diagonalization
+    exp_val_corr_01_diag = functions.ground_state_expectation_value(dim_grid, H, correlation_01)
+    print(f"Expectation value of the correlation of qubits 0 and 1 [Diagonalization]= {exp_val_corr_01_diag}")
+    
+    # Obtain ground state property by SA VQE
+    depth = 3
+    exp_val_corr_01_SA_VQE = SA_VQE_expec_val(dim_grid, H, correlation_01, depth)
+    print(f"Expectation value of the correlation of qubits 0 and 1 [Diagonalization]= {exp_val_corr_01_SA_VQE}")
 
-    # Calculate the ground state expectation value of the observable
-    exp_val_corr_01 = functions.ground_state_expectation_value(dim_grid, H, correlation_01)
-    print(f"Expectation value of the correlation of qubits 0 and 1 = {exp_val_corr_01}")
 
 elif mode == 'training':
     dim_grid = (2,5)
@@ -53,11 +60,6 @@ elif mode == 'training':
     print(f"Optimal alpha: {optimal_alpha}")
     print(f'MSE: training -> {train_mse}; test -> {test_mse}')
     print(f'R^2: training -> {train_r2}; test -> {test_r2}')
-
-
-
-
-
 
 
 
