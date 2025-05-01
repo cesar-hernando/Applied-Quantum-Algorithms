@@ -6,6 +6,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from typing import Optional
 import pennylane as qml
+import networkx as nx
 
 
 def generate_couplings(dim_grid, rng: Optional[np.random.RandomState] = None):
@@ -38,6 +39,58 @@ def generate_couplings(dim_grid, rng: Optional[np.random.RandomState] = None):
     J_down = np.array([[rng.choice([+1,-1]) for j in range(dim_grid[1])] for i in range(dim_grid[0]-1)])
 
     return J_right, J_down
+
+def visualize_couplings(dim_grid, J_right, J_down):
+    '''
+    Generates a plot to visualize the value of the couplings between spins
+
+    Inputs
+    -------
+    dim_grid: tuple
+        Contains the number of rows and columns of the rectangular spin lattice
+
+    J_right: np.ndarray
+        Horizontal couplings
+        Dimension dim_grid[0] x (dim_grid[1]-1)
+
+    J_down: np.ndarray
+        Vertical couplings
+        Dimension (dim_grid[0]-1) x dim_grid[1]
+    '''
+    rows, columns = dim_grid
+    G = nx.Graph()
+    pos = {}
+
+    # Add nodes and positions
+    for i in range(rows):
+        for j in range(columns):
+            qubit = (i,j)
+            G.add_node(qubit)
+            pos[qubit] = (j,-i)
+
+    # Add horizontal edges from J_right
+    for i in range(rows):
+        for j in range(columns-1):
+            q1 = (i,j)
+            q2 = (i,j+1)
+            sign = J_right[i,j]
+            G.add_edge(q1, q2, color='red' if sign==1 else 'blue', weight=sign)
+
+    # Ad vertical edges from J_down
+    for i in range(rows - 1):
+        for j in range(columns):
+            q1 = (i, j)
+            q2 = (i + 1, j)
+            sign = J_down[i, j]
+            G.add_edge(q1, q2, color='red' if sign == 1 else 'blue', weight=sign)
+
+    # Draw the network
+    edge_colors = [G[u][v]['color'] for u, v in G.edges()]
+    nx.draw(G, pos, with_labels=True, node_color='lightgray', edge_color=edge_colors, node_size=700, width=2)
+    plt.title("2D Spin Grid with Coupling Signs\nRed: +1 (ferromagnetic), Blue: −1 (antiferromagnetic)")
+    plt.axis('off')
+    plt.show()
+
 
 
 def hamiltonian(dim_grid, J_right, J_down):
@@ -87,12 +140,15 @@ def hamiltonian(dim_grid, J_right, J_down):
 
     return hamiltonian
 
-def observable(obs_name):
+def observable(dim_grid, obs_name):
     '''
     Computes the Hamiltonian of a 2D antiferromagnetic system of N spins
 
     Inputs
     ------
+    dim_grid: tuple
+        Contains the number of rows and columns of the rectangular spin lattice
+
     obs_name: str
         Name/identification of the observable to measure
 
@@ -102,12 +158,21 @@ def observable(obs_name):
         Representation of the observable that we want to measure
         
     '''
+
+    n_qubits = dim_grid[0]*dim_grid[1]
+
     if obs_name == 'corr01':
         # Define the observable to measure: the correlation function between qubits 0 and 1
         coefs = (1/3)*np.ones(3)
         i0 = str((0,0))
         i1 = str((0,1))
         ops = [qml.PauliX(i0) @ qml.PauliX(i1), qml.PauliY(i0) @ qml.PauliY(i1), qml.PauliZ(i0) @ qml.PauliZ(i1)]
+        observable = qml.Hamiltonian(coefs, ops)
+
+    elif obs_name == 'magnetization':
+        # Define the observable to measure: magnetization
+        coefs = np.ones(n_qubits)
+        ops = [qml.PauliZ(str((x,y))) for x in range(dim_grid[0]) for y in range(dim_grid[1])]
         observable = qml.Hamiltonian(coefs, ops)
     
     return observable
@@ -155,7 +220,7 @@ def ground_state_expectation_value(dim_grid, hamiltonian, observable):
     # Calculate the expectation value of correlation_01 in the ground state
     expectation_value = (ground_state.conj().T @ obs_matrix @ ground_state).real
 
-    return expectation_value
+    return expectation_value, ground_state_energy
 
 def generate_training_set(dim_grid, num_examples, observable_name):
     '''

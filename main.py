@@ -16,25 +16,37 @@ mode = 'basic_test'
 
 if mode == 'basic_test':
     # Set the number of qubits in each row/column of the square grid
-    dim_grid = (2,5)
+    dim_grid = (2,2)
 
     # Generate the coupling coefficients
     J_right, J_down = functions.generate_couplings(dim_grid)
     print('Couplings generated')
+
+    # Visualize the lattice with the randomly generated couplings
+    functions.visualize_couplings(dim_grid, J_right, J_down)
+
     # Obtain the Hamiltonian (qml.Hamiltonian) of the 2D Antiferromagnetic lattice
     H = functions.hamiltonian(dim_grid, J_right, J_down)
     print('Hamiltonian generated')
-    # Define the observable
-    correlation_01 = functions.observable('corr01')
+
+    # Define the observable by its name
+    # Options: 'corr01', 'magnetization'
+    obs_name = 'magnetization'
+    obs = functions.observable(dim_grid, obs_name)
     print('Observable generated')
+
     # Obtain ground state property by diagonalization
-    exp_val_corr_01_diag = functions.ground_state_expectation_value(dim_grid, H, correlation_01)
-    print(f"Expectation value of the correlation of qubits 0 and 1 [Diagonalization]= {exp_val_corr_01_diag}")
+    exp_val_corr_01_diag, ground_state_energy_diag = functions.ground_state_expectation_value(dim_grid, H, obs)
+    print(f"Expectation value of {obs_name} [Diagonalization]= {exp_val_corr_01_diag}")
+    print(f'Ground state energy [Diagonalization] = {ground_state_energy_diag}')
     
     # Obtain ground state property by SA VQE
-    depth = 3
-    exp_val_corr_01_SA_VQE, ground_state_energy = SA_VQE_expec_val(dim_grid, H, correlation_01, depth)
-    print(f"Expectation value of the correlation of qubits 0 and 1 [Diagonalization]= {exp_val_corr_01_SA_VQE}")
+    depth = 4
+    opt_steps = 500
+    learning_rate = 0.01
+    exp_val_corr_01_SA_VQE, ground_state_energy_VQE = SA_VQE_expec_val(dim_grid, H, obs, depth, opt_steps, learning_rate)
+    print(f"Expectation value of {obs_name} [VQE]= {exp_val_corr_01_SA_VQE}")
+    print(f'Ground state energy [VQE] = {ground_state_energy_VQE}')
 
 
 elif mode == 'training':

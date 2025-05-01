@@ -7,7 +7,7 @@ import pennylane.numpy as np
 import pennylane as qml
 
 
-def SA_VQE_expec_val(dim_grid, hamiltonian, observable, depth):
+def SA_VQE_expec_val(dim_grid, hamiltonian, observable, depth, opt_steps, learning_rate):
     '''
     Inputs
     ------
@@ -22,6 +22,12 @@ def SA_VQE_expec_val(dim_grid, hamiltonian, observable, depth):
 
     depth: int
         Number of times that we apply the RZ,RX,RZ,CNOT block in VQE
+
+    opt_steps: int
+        Number of iterations in the optimization
+
+    learning_rate: float
+        Adam initial step size
 
     Output
     ------
@@ -74,20 +80,20 @@ def SA_VQE_expec_val(dim_grid, hamiltonian, observable, depth):
         Optimizer to adjust the parameters.
         Args:
             params (np.array): An array with the trainable parameters of the QAOA ansatz.
+        
         Returns:
             (np.array): An array with the optimized parameters of the HEA ansatz.
         ''' 
     
-        opt = qml.AdamOptimizer(0.1)
-        steps = 100
+        opt = qml.AdamOptimizer(learning_rate)
 
-        for _ in range(steps):
+        for _ in range(opt_steps):
             params = opt.step(energy, params)
         
         return params
 
 
-    params_initial = np.random.uniform(-0.1, 0.1, size=(3*depth, n_qubits), requires_grad=True)
+    params_initial = np.random.uniform(-np.pi, np.pi, size=(3*depth, n_qubits), requires_grad=True)
     params_final = optimizer(params_initial)
     ground_state_energy = energy(params_final)
     obs_ground_state = observable_exp_val(params_final)
