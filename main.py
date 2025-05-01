@@ -33,7 +33,7 @@ if mode == 'basic_test':
     
     # Obtain ground state property by SA VQE
     depth = 3
-    exp_val_corr_01_SA_VQE = SA_VQE_expec_val(dim_grid, H, correlation_01, depth)
+    exp_val_corr_01_SA_VQE, ground_state_energy = SA_VQE_expec_val(dim_grid, H, correlation_01, depth)
     print(f"Expectation value of the correlation of qubits 0 and 1 [Diagonalization]= {exp_val_corr_01_SA_VQE}")
 
 

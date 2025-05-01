@@ -92,7 +92,7 @@ def SA_VQE_expec_val(dim_grid, hamiltonian, observable, depth):
     ground_state_energy = energy(params_final)
     obs_ground_state = observable_exp_val(params_final)
 
-    return obs_ground_state, ground_state_energy
+    return obs_ground_state.item(), ground_state_energy.item()
 
 
 
