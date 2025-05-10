@@ -7,9 +7,12 @@ import matplotlib.pyplot as plt
 from typing import Optional
 import pennylane as qml
 import networkx as nx
+from sklearn.linear_model import LassoCV
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error, r2_score
 
 
-def generate_couplings(dim_grid, rng: Optional[np.random.RandomState] = None):
+def generate_couplings(dim_grid, seed=None):
     '''
     Generate the horizontal and vertical couplings between the qubits in the square lattice sampling from a uniform distribution {-1,1}
 
@@ -32,11 +35,13 @@ def generate_couplings(dim_grid, rng: Optional[np.random.RandomState] = None):
         Dimension (dim_grid[0]-1) x dim_grid[1]
     '''
 
-    if rng is None:
-        rng = np.random.RandomState(seed=42)
+    if seed is not None:
+        np.random.seed(seed)
     
-    J_right = np.array([[rng.choice([+1,-1]) for j in range(dim_grid[1]-1)] for i in range(dim_grid[0])])
-    J_down = np.array([[rng.choice([+1,-1]) for j in range(dim_grid[1])] for i in range(dim_grid[0]-1)])
+    #J_right = np.array([[rng.choice([+1,-1]) for j in range(dim_grid[1]-1)] for i in range(dim_grid[0])])
+    #J_down = np.array([[rng.choice([+1,-1]) for j in range(dim_grid[1])] for i in range(dim_grid[0]-1)])
+    J_right = np.random.uniform(-1,1, size=(dim_grid[0], dim_grid[1]-1))
+    J_down = np.random.uniform(-1,1, size=(dim_grid[0]-1, dim_grid[1]))
 
     return J_right, J_down
 
@@ -163,15 +168,15 @@ def observable(dim_grid, obs_name):
 
     if obs_name == 'corr01':
         # Define the observable to measure: the correlation function between qubits 0 and 1
-        coefs = (1/3)*np.ones(3)
+        coefs = [1/3]
         i0 = str((0,0))
         i1 = str((0,1))
-        ops = [qml.PauliX(i0) @ qml.PauliX(i1), qml.PauliY(i0) @ qml.PauliY(i1), qml.PauliZ(i0) @ qml.PauliZ(i1)]
+        ops = [qml.PauliX(i0) @ qml.PauliX(i1) + qml.PauliY(i0) @ qml.PauliY(i1) + qml.PauliZ(i0) @ qml.PauliZ(i1)]
         observable = qml.Hamiltonian(coefs, ops)
 
     elif obs_name == 'magnetization':
         # Define the observable to measure: magnetization
-        coefs = np.ones(n_qubits)
+        coefs = np.ones(n_qubits).tolist()
         ops = [qml.PauliZ(str((x,y))) for x in range(dim_grid[0]) for y in range(dim_grid[1])]
         observable = qml.Hamiltonian(coefs, ops)
     
@@ -207,15 +212,9 @@ def ground_state_expectation_value(dim_grid, hamiltonian, observable):
 
     # Diagonalize the Hamiltonian to find the ground state
     eigenvalues, eigenvectors = np.linalg.eigh(H_matrix)
+
     ground_state_energy = eigenvalues[0]
     ground_state = eigenvectors[:,0]
-
-    # Print the ground state and its energy
-    verbose = False
-    if verbose:
-        np.set_printoptions(precision=1, suppress=True)
-        print(f"Ground state =  {ground_state.real}")
-        print(f"GS energy = {ground_state_energy}")
 
     # Calculate the expectation value of correlation_01 in the ground state
     expectation_value = (ground_state.conj().T @ obs_matrix @ ground_state).real
@@ -246,21 +245,41 @@ def generate_training_set(dim_grid, num_examples, observable_name):
         Vector of length num_examples with the expectation values of the measured observable
         
     ''' 
-
-    rng = np.random.RandomState(seed=42)
+    
     obs = observable(observable_name)
     J_len = int(2*dim_grid[0]*dim_grid[1] - dim_grid[0] - dim_grid[1])  # Number of couplings = len(J_right) + len(J_down)
     X = np.zeros((num_examples, J_len))
     Y = np.zeros(num_examples)
     for l in range(num_examples):
-        J_right, J_down = generate_couplings(dim_grid, rng)
+        J_right, J_down = generate_couplings(dim_grid)
         J_right_flat = J_right.flatten()
         J_down_flat = J_down.flatten()
         X[l,:] = np.concatenate((J_right_flat, J_down_flat))
-        Y[l] = ground_state_expectation_value(dim_grid, hamiltonian(dim_grid, J_right, J_down), obs)
+        Y[l], _ = ground_state_expectation_value(dim_grid, hamiltonian(dim_grid, J_right, J_down), obs)
 
     return X, Y
 
 
+def lasso_regression(X, y):
+    # Split the dataset in training and test sets
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
+    # Define an object of the class Lasso and train the model
+    lasso = LassoCV(alphas=[1e-4,1e-3,1e-2,1e-1,1], cv=5, random_state=42)
+    lasso.fit(X_train, y_train)
+    optimal_alpha = lasso.alpha_
+    coefficients = lasso.coef_
+    L1_norm_coef = np.linalg.norm(coefficients, ord=1)
+
+    # Calculate the predictions for the test set
+    y_pred_train = lasso.predict(X_train)
+    y_pred_test = lasso.predict(X_test)
+
+    # Evaluate the error and R^2 score in training data and test
+    train_mse = mean_squared_error(y_train, y_pred_train)
+    test_mse = mean_squared_error(y_test, y_pred_test)
+    train_r2 = r2_score(y_train, y_pred_train)
+    test_r2 = r2_score(y_test, y_pred_test)
+
+    return coefficients, L1_norm_coef, optimal_alpha, train_mse, test_mse, train_r2, test_r2
 
