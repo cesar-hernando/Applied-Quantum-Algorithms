@@ -10,6 +10,8 @@ import networkx as nx
 from sklearn.linear_model import LassoCV
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
+import tensorflow as tf
+from tensorflow.keras.losses import MeanSquaredError
 
 
 def generate_couplings(dim_grid, seed=None):
@@ -38,8 +40,7 @@ def generate_couplings(dim_grid, seed=None):
     if seed is not None:
         np.random.seed(seed)
     
-    #J_right = np.array([[rng.choice([+1,-1]) for j in range(dim_grid[1]-1)] for i in range(dim_grid[0])])
-    #J_down = np.array([[rng.choice([+1,-1]) for j in range(dim_grid[1])] for i in range(dim_grid[0]-1)])
+
     J_right = np.random.uniform(-1,1, size=(dim_grid[0], dim_grid[1]-1))
     J_down = np.random.uniform(-1,1, size=(dim_grid[0]-1, dim_grid[1]))
 
@@ -125,6 +126,7 @@ def hamiltonian(dim_grid, J_right, J_down):
     coef = []
     ops = []
 
+    
     # Fill the horizontal interactions
     for i in range(dim_grid[0]):
         for j in range(dim_grid[1]-1):
@@ -132,6 +134,7 @@ def hamiltonian(dim_grid, J_right, J_down):
             index2 = str((i,j+1))
             coef.append(J_right[i,j])
             ops.append(qml.PauliX(index1)@qml.PauliX(index2) + qml.PauliY(index1)@qml.PauliY(index2) + qml.PauliZ(index1)@qml.PauliZ(index2))
+            #ops.append(qml.PauliZ(index1)@qml.PauliZ(index2))
 
     # Fill the vertical interactions
     for i in range(dim_grid[0]-1):
@@ -140,12 +143,14 @@ def hamiltonian(dim_grid, J_right, J_down):
             index2 = str((i+1,j))
             coef.append(J_down[i,j])
             ops.append(qml.PauliX(index1)@qml.PauliX(index2) + qml.PauliY(index1)@qml.PauliY(index2) + qml.PauliZ(index1)@qml.PauliZ(index2))
+            #ops.append(qml.PauliZ(index1)@qml.PauliZ(index2))
 
     hamiltonian = qml.Hamiltonian(coef, ops)
+    
 
     return hamiltonian
 
-def observable(dim_grid, obs_name):
+def observable(dim_grid, obs_name, qubits):
     '''
     Computes the Hamiltonian of a 2D antiferromagnetic system of N spins
 
@@ -157,6 +162,10 @@ def observable(dim_grid, obs_name):
     obs_name: str
         Name/identification of the observable to measure
 
+    qubits: list
+        List containing the tuples representing the x and y coordinates of the qubits in the lattice that we want to measure
+
+
     Output
     ------
     observable: qml.Hamiltonian
@@ -166,20 +175,14 @@ def observable(dim_grid, obs_name):
 
     n_qubits = dim_grid[0]*dim_grid[1]
 
-    if obs_name == 'corr01':
+    if obs_name == 'correlation':
         # Define the observable to measure: the correlation function between qubits 0 and 1
         coefs = [1/3]
-        i0 = str((0,0))
-        i1 = str((0,1))
+        i0 = str(qubits[0])
+        i1 = str(qubits[1])
         ops = [qml.PauliX(i0) @ qml.PauliX(i1) + qml.PauliY(i0) @ qml.PauliY(i1) + qml.PauliZ(i0) @ qml.PauliZ(i1)]
         observable = qml.Hamiltonian(coefs, ops)
 
-    elif obs_name == 'magnetization':
-        # Define the observable to measure: magnetization
-        coefs = np.ones(n_qubits).tolist()
-        ops = [qml.PauliZ(str((x,y))) for x in range(dim_grid[0]) for y in range(dim_grid[1])]
-        observable = qml.Hamiltonian(coefs, ops)
-    
     return observable
 
 
@@ -221,7 +224,7 @@ def ground_state_expectation_value(dim_grid, hamiltonian, observable):
 
     return expectation_value, ground_state_energy
 
-def generate_training_set(dim_grid, num_examples, observable_name):
+def generate_training_set(dim_grid, num_examples, observable_name, qubits):
     '''
     Generate the training set for the model
 
@@ -246,7 +249,7 @@ def generate_training_set(dim_grid, num_examples, observable_name):
         
     ''' 
     
-    obs = observable(observable_name)
+    obs = observable(dim_grid, observable_name, qubits)
     J_len = int(2*dim_grid[0]*dim_grid[1] - dim_grid[0] - dim_grid[1])  # Number of couplings = len(J_right) + len(J_down)
     X = np.zeros((num_examples, J_len))
     Y = np.zeros(num_examples)
@@ -283,3 +286,34 @@ def lasso_regression(X, y):
 
     return coefficients, L1_norm_coef, optimal_alpha, train_mse, test_mse, train_r2, test_r2
 
+
+def neural_network(X,y):
+    # Split the dataset in training and test sets
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    dim_input = X_test.shape[1]
+    num_examples = X_test.shape[0]
+    # Define the model
+    seed = 42
+    tf.random.set_seed(seed)
+    
+    model = tf.keras.Sequential(([
+        tf.keras.layers.Input(dim_input),
+        tf.keras.layers.Dense(dim_input, activation="relu"),
+        tf.keras.layers.Dense(dim_input/2, activation="relu"),
+        tf.keras.layers.Dense(dim_input/4, activation="relu"),
+        tf.keras.layers.Dense(1, activation=None)
+        ]))
+    
+    # Set the optimizer and loss function
+    opt = tf.keras.optimizers.Adam(learning_rate=1e-2)
+    model.compile(optimizer=opt, loss=MeanSquaredError())
+    # Set an early stopping criteria using validation loss
+    early_stop = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3, min_delta=0.001)
+    # Train the model
+    history = model.fit(X_train, y_train, epochs=100, batch_size=int(num_examples/5), callbacks=[early_stop])
+    # Compute the output of the model on the test data
+    output = model.predict(X_test)
+    # Calculate and print the accuracy
+    print(f"r2 score on test data = {r2_score(output, y_test)}")
+    print(f"Mean squared error on test data = {mean_squared_error(output, y_test)}")
+    
