@@ -12,6 +12,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 import tensorflow as tf
 from tensorflow.keras.losses import MeanSquaredError
+from SA_VQE import SA_VQE_expec_val
 
 
 def generate_couplings(dim_grid, seed=None):
@@ -162,8 +163,8 @@ def observable(dim_grid, obs_name, qubits):
     obs_name: str
         Name/identification of the observable to measure
 
-    qubits: list
-        List containing the tuples representing the x and y coordinates of the qubits in the lattice that we want to measure
+    qubits: tuple
+        Tuple containing the tuples representing the x and y coordinates of the qubits in the lattice that we want to measure
 
 
     Output
@@ -224,7 +225,7 @@ def ground_state_expectation_value(dim_grid, hamiltonian, observable):
 
     return expectation_value, ground_state_energy
 
-def generate_training_set(dim_grid, num_examples, observable_name, qubits):
+def generate_training_set(dim_grid, num_examples, observable_name, qubits, mode, depth=None, opt_steps=None, learning_rate=None):
     '''
     Generate the training set for the model
 
@@ -238,6 +239,9 @@ def generate_training_set(dim_grid, num_examples, observable_name, qubits):
 
     observable_name: str
         Name/identification of the k-local observable whose ground state expectation value we want to evaluate
+
+    mode: str
+        Name ('quantum' or 'classical') that identifies how we want to calculate the expectation values of the observable in the ground state
 
     Output
     ------
@@ -258,7 +262,11 @@ def generate_training_set(dim_grid, num_examples, observable_name, qubits):
         J_right_flat = J_right.flatten()
         J_down_flat = J_down.flatten()
         X[l,:] = np.concatenate((J_right_flat, J_down_flat))
-        Y[l], _ = ground_state_expectation_value(dim_grid, hamiltonian(dim_grid, J_right, J_down), obs)
+        if mode == 'classical':
+            Y[l], _ = ground_state_expectation_value(dim_grid, hamiltonian(dim_grid, J_right, J_down), obs)
+        elif mode == 'quantum':
+            Y[l], _ = SA_VQE_expec_val(dim_grid, hamiltonian(dim_grid, J_right, J_down), obs, depth, opt_steps, learning_rate)
+
 
     return X, Y
 
@@ -290,6 +298,7 @@ def lasso_regression(X, y):
 def neural_network(X,y):
     # Split the dataset in training and test sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    X_test, X_val, y_test, y_val = train_test_split(X_test, y_test, test_size=0.5, random_state=42)
     dim_input = X_test.shape[1]
     num_examples = X_test.shape[0]
     # Define the model
@@ -310,7 +319,7 @@ def neural_network(X,y):
     # Set an early stopping criteria using validation loss
     early_stop = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3, min_delta=0.001)
     # Train the model
-    history = model.fit(X_train, y_train, epochs=100, batch_size=int(num_examples/5), callbacks=[early_stop])
+    history = model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=100, batch_size=int(num_examples/5), callbacks=[early_stop])
     # Compute the output of the model on the test data
     output = model.predict(X_test)
     # Calculate and print the accuracy

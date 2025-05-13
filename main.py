@@ -11,7 +11,7 @@ import pennylane as qml
 import functions
 from SA_VQE import SA_VQE_expec_val
 
-mode = 'basic_test'
+mode = 'training'
 
 if mode == 'basic_test':
     # Set the number of qubits in each row/column of the square grid
@@ -30,8 +30,8 @@ if mode == 'basic_test':
     # Obtain the Hamiltonian (qml.Hamiltonian) of the 2D Antiferromagnetic lattice
     hamiltonian = functions.hamiltonian(dim_grid, J_right, J_down)
 
-    # Define the observable by its name
-    # Options: 'corr01', 'magnetization'
+    # Define the observable by its name and qubits it affects
+    # Options: obs_name = 'correlation', qubits = (q0, q1)
     obs_name = 'correlation'
 
     correlations_matrix_diag = np.zeros((num_qubits, num_qubits))
@@ -85,20 +85,21 @@ if mode == 'basic_test':
   
 
 elif mode == 'training':
-    dim_grid = (2,5)
-    num_examples = 100
+    # General parameters
+    dim_grid = (2,2)
     obs_name = 'correlation'
-    qubits = [(0,0), (0,1)]
+    qubits = ((0,0), (0,1))
 
-    X, y = functions.generate_training_set(dim_grid, num_examples, obs_name, qubits)
+    # Training parameters
+    num_examples = 100
+    mode = 'quantum'
 
-    verbose = False
-    if verbose:
-        plt.figure()
-        plt.plot(range(len(y)), y)
-        plt.xlabel('Coupling random realization')
-        plt.ylabel(f'Expectarion value of {obs_name}')
-        plt.show()
+    # VQE parameters
+    depth = 3
+    opt_steps = 500
+    learning_rate = 0.01
+    
+    X, y = functions.generate_training_set(dim_grid, num_examples, obs_name, qubits, mode, depth, opt_steps, learning_rate)
 
     # Train the model with neural network
     print('\nNeural Network')
