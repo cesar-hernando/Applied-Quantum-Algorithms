@@ -73,6 +73,11 @@ def SA_VQE_expec_val(dim_grid, hamiltonian, observable, depth, opt_steps, learni
     def observable_exp_val(params):
         hea_ansatz(params)
         return qml.expval(observable)
+    
+    @qml.qnode(dev)
+    def pauli_string_exp_val(params, pauli_string):
+        hea_ansatz(params)
+        return qml.expval(pauli_string)
 
 
     def optimizer(params):
@@ -96,11 +101,16 @@ def SA_VQE_expec_val(dim_grid, hamiltonian, observable, depth, opt_steps, learni
     #params_initial = np.random.uniform(-np.pi, np.pi, size=(3*depth, n_qubits), requires_grad=True)
     params_initial = np.random.uniform(-np.pi, np.pi, size=(3*depth, n_qubits))
     params_final = optimizer(params_initial)
-    obs_ground_state = observable_exp_val(params_final)
-    ground_state_energy = energy(params_final)
-    
 
-    return obs_ground_state.item(), ground_state_energy.item()
+    ground_state_energy = energy(params_final)
+
+    obs_ground_state = observable_exp_val(params_final)
+
+    Pauli_strings_ground_state = []
+    for pauli_string in observable.ops[0]:
+        Pauli_strings_ground_state.append(pauli_string_exp_val(params_final, pauli_string).item())
+    
+    return obs_ground_state.item(), Pauli_strings_ground_state, ground_state_energy.item()
 
 
 

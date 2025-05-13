@@ -92,24 +92,50 @@ elif mode == 'training':
 
     # Training parameters
     num_examples = 100
-    mode = 'quantum'
+    mode = 'fourier'
 
     # VQE parameters
     depth = 3
     opt_steps = 500
     learning_rate = 0.01
     
-    X, y = functions.generate_training_set(dim_grid, num_examples, obs_name, qubits, mode, depth, opt_steps, learning_rate)
+    # Random fourier map parameters
+    delta = 1
+    gamma = 0.6
+    R = 10
+    
+    #X, PhiX_quantum, _, y_quantum = functions.generate_training_set(dim_grid, num_examples, obs_name, qubits, mode='quantum', depth=depth, opt_steps=opt_steps, learning_rate=learning_rate)
+    X, _, PhiX_fourier, y_classical = functions.generate_training_set(dim_grid, num_examples, obs_name, qubits, mode='fourier', delta=delta, gamma = gamma, R=R)
+    print("\nData set generated")
 
+    
     # Train the model with neural network
-    print('\nNeural Network')
-    functions.neural_network(X, y)
-
+    print('\nNeural Network\n')
+    functions.neural_network(X, y_classical)
+    
 
     # Train the model classically (generation of expectation values classically) and with LASSO regression
-    
-    coefficients, L1_norm_coef, optimal_alpha, train_mse, test_mse, train_r2, test_r2 = functions.lasso_regression(X, y)
-    print('\nLASSO')
+    # Without feature map
+    coefficients, L1_norm_coef, optimal_alpha, train_mse, test_mse, train_r2, test_r2 = functions.lasso_regression(X, y_classical)
+    print('\nLASSO without feature map')
+    print(f'Coefficients (omega)= {coefficients}')
+    print(f'L1 norm of omega = {L1_norm_coef}')
+    print(f"Optimal alpha: {optimal_alpha}")
+    print(f'MSE: training -> {train_mse}; test -> {test_mse}')
+    print(f'R^2: training -> {train_r2}; test -> {test_r2}')
+    '''
+    # With quantum feature map
+    coefficients, L1_norm_coef, optimal_alpha, train_mse, test_mse, train_r2, test_r2 = functions.lasso_regression(PhiX_quantum, y_quantum)
+    print('\nLASSO with quantum feature map')
+    print(f'Coefficients (omega)= {coefficients}')
+    print(f'L1 norm of omega = {L1_norm_coef}')
+    print(f"Optimal alpha: {optimal_alpha}")
+    print(f'MSE: training -> {train_mse}; test -> {test_mse}')
+    print(f'R^2: training -> {train_r2}; test -> {test_r2}')
+    '''
+     # With random fourier map
+    coefficients, L1_norm_coef, optimal_alpha, train_mse, test_mse, train_r2, test_r2 = functions.lasso_regression(PhiX_fourier, y_classical)
+    print('\nLASSO with random Fourier feature map')
     print(f'Coefficients (omega)= {coefficients}')
     print(f'L1 norm of omega = {L1_norm_coef}')
     print(f"Optimal alpha: {optimal_alpha}")

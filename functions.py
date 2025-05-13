@@ -13,6 +13,7 @@ from sklearn.metrics import mean_squared_error, r2_score
 import tensorflow as tf
 from tensorflow.keras.losses import MeanSquaredError
 from SA_VQE import SA_VQE_expec_val
+import fourier_fm
 
 
 def generate_couplings(dim_grid, seed=None):
@@ -204,8 +205,14 @@ def ground_state_expectation_value(dim_grid, hamiltonian, observable):
 
     Output
     ------
-    expectation_value: float
+    expectation_value_obs: float
         Formula: Tr(\rho(x) O)
+
+    expectation_value_Paulis: list
+        List of the graound state expectation value of the Pauli strings in which the observable is decomposed in
+
+    ground_state_energy: float
+        Ground state energy of the given Hamiltonian
         
     '''
      
@@ -221,11 +228,23 @@ def ground_state_expectation_value(dim_grid, hamiltonian, observable):
     ground_state = eigenvectors[:,0]
 
     # Calculate the expectation value of correlation_01 in the ground state
-    expectation_value = (ground_state.conj().T @ obs_matrix @ ground_state).real
+    expectation_value_obs = (ground_state.conj().T @ obs_matrix @ ground_state).real
 
-    return expectation_value, ground_state_energy
+    # Calculate the expectation value of the Pauli strings in which the observable is decomposed
+    expectation_value_Paulis = []
+    Pauli_strings = observable.ops[0]
 
-def generate_training_set(dim_grid, num_examples, observable_name, qubits, mode, depth=None, opt_steps=None, learning_rate=None):
+    for pauli_string in Pauli_strings:
+        # Transform the qml.Hamiltonian Pauli string object to an np matrix
+        pauli_string_matrix = qml.matrix(pauli_string, wire_order=wires)
+        # Calculate the expectation value of correlation_01 in the ground state
+        expectation_value_Paulis.append((ground_state.conj().T @ pauli_string_matrix @ ground_state).real)
+
+    return expectation_value_obs, np.array(expectation_value_Paulis), ground_state_energy
+
+
+
+def generate_training_set(dim_grid, num_examples, observable_name, qubits, mode, depth=None, opt_steps=None, learning_rate=None, delta=None, gamma=None, R=None):
     '''
     Generate the training set for the model
 
@@ -256,19 +275,32 @@ def generate_training_set(dim_grid, num_examples, observable_name, qubits, mode,
     obs = observable(dim_grid, observable_name, qubits)
     J_len = int(2*dim_grid[0]*dim_grid[1] - dim_grid[0] - dim_grid[1])  # Number of couplings = len(J_right) + len(J_down)
     X = np.zeros((num_examples, J_len))
+    PhiX_quantum = np.zeros((num_examples, len(obs.ops[0])))
     Y = np.zeros(num_examples)
+
+    if mode == 'fourier':
+        local_right_edges, local_down_edges = fourier_fm.get_local_edges(qubits, dim_grid, delta)
+        w = np.random.normal(0, 1, R)
+        PhiX_fourier = np.zeros((num_examples, ((np.sum(local_right_edges)+np.sum(local_down_edges))*2*R)))
+    elif mode == 'quantum':
+        PhiX_fourier = False
+    
+
     for l in range(num_examples):
         J_right, J_down = generate_couplings(dim_grid)
         J_right_flat = J_right.flatten()
         J_down_flat = J_down.flatten()
         X[l,:] = np.concatenate((J_right_flat, J_down_flat))
         if mode == 'classical':
-            Y[l], _ = ground_state_expectation_value(dim_grid, hamiltonian(dim_grid, J_right, J_down), obs)
+            Y[l], PhiX_quantum[l,:], _ = ground_state_expectation_value(dim_grid, hamiltonian(dim_grid, J_right, J_down), obs)
         elif mode == 'quantum':
-            Y[l], _ = SA_VQE_expec_val(dim_grid, hamiltonian(dim_grid, J_right, J_down), obs, depth, opt_steps, learning_rate)
+            Y[l], PhiX_quantum[l,:], _ = SA_VQE_expec_val(dim_grid, hamiltonian(dim_grid, J_right, J_down), obs, depth, opt_steps, learning_rate)
+        elif mode == 'fourier':
+            Y[l], _, _ = ground_state_expectation_value(dim_grid, hamiltonian(dim_grid, J_right, J_down), obs)
+            Z = fourier_fm.generate_local_couplings(J_right, J_down, local_right_edges, local_down_edges)
+            PhiX_fourier[l,:] = fourier_fm.random_fourier_feature_map(Z, w, gamma, R)
 
-
-    return X, Y
+    return X, PhiX_quantum, PhiX_fourier, Y
 
 
 def lasso_regression(X, y):
@@ -307,9 +339,9 @@ def neural_network(X,y):
     
     model = tf.keras.Sequential(([
         tf.keras.layers.Input(dim_input),
-        tf.keras.layers.Dense(dim_input, activation="relu"),
-        tf.keras.layers.Dense(dim_input/2, activation="relu"),
-        tf.keras.layers.Dense(dim_input/4, activation="relu"),
+        tf.keras.layers.Dense(8, activation="relu"),
+        tf.keras.layers.Dense(16, activation="relu"),
+        tf.keras.layers.Dense(8, activation="relu"),
         tf.keras.layers.Dense(1, activation=None)
         ]))
     
@@ -317,9 +349,10 @@ def neural_network(X,y):
     opt = tf.keras.optimizers.Adam(learning_rate=1e-2)
     model.compile(optimizer=opt, loss=MeanSquaredError())
     # Set an early stopping criteria using validation loss
-    early_stop = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=3, min_delta=0.001)
+    #early_stop = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=20, min_delta=0.00001)
     # Train the model
-    history = model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=100, batch_size=int(num_examples/5), callbacks=[early_stop])
+    #history = model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=100, batch_size=int(num_examples/5), callbacks=[early_stop])
+    history = model.fit(X_train, y_train, validation_data=(X_val, y_val), batch_size=int(num_examples/5), epochs=100)
     # Compute the output of the model on the test data
     output = model.predict(X_test)
     # Calculate and print the accuracy
