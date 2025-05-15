@@ -86,7 +86,7 @@ if mode == 'basic_test':
 
 elif mode == 'training':
     # General parameters
-    dim_grid = (2,2)
+    dim_grid = (2,5)
     obs_name = 'correlation'
     qubits = ((0,0), (0,1))
 
@@ -102,9 +102,9 @@ elif mode == 'training':
     # Random fourier map parameters
     delta = 1
     gamma = 0.6
-    R = 10
+    R = 20
     
-    #X, PhiX_quantum, _, y_quantum = functions.generate_training_set(dim_grid, num_examples, obs_name, qubits, mode='quantum', depth=depth, opt_steps=opt_steps, learning_rate=learning_rate)
+    _, PhiX_quantum, _, y_quantum = functions.generate_training_set(dim_grid, num_examples, obs_name, qubits, mode='quantum', depth=depth, opt_steps=opt_steps, learning_rate=learning_rate)
     X, _, PhiX_fourier, y_classical = functions.generate_training_set(dim_grid, num_examples, obs_name, qubits, mode='fourier', delta=delta, gamma = gamma, R=R)
     print("\nData set generated")
 
@@ -123,7 +123,7 @@ elif mode == 'training':
     print(f"Optimal alpha: {optimal_alpha}")
     print(f'MSE: training -> {train_mse}; test -> {test_mse}')
     print(f'R^2: training -> {train_r2}; test -> {test_r2}')
-    '''
+    
     # With quantum feature map
     coefficients, L1_norm_coef, optimal_alpha, train_mse, test_mse, train_r2, test_r2 = functions.lasso_regression(PhiX_quantum, y_quantum)
     print('\nLASSO with quantum feature map')
@@ -132,7 +132,7 @@ elif mode == 'training':
     print(f"Optimal alpha: {optimal_alpha}")
     print(f'MSE: training -> {train_mse}; test -> {test_mse}')
     print(f'R^2: training -> {train_r2}; test -> {test_r2}')
-    '''
+    
      # With random fourier map
     coefficients, L1_norm_coef, optimal_alpha, train_mse, test_mse, train_r2, test_r2 = functions.lasso_regression(PhiX_fourier, y_classical)
     print('\nLASSO with random Fourier feature map')
