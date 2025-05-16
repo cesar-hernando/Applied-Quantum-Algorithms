@@ -17,6 +17,7 @@ from tensorflow.keras import regularizers
 
 from SA_VQE import SA_VQE_expec_val
 import fourier_feature_map
+import parameters
 
 
 
@@ -194,6 +195,33 @@ def hamiltonian(dim_grid, J_right, J_down, hamiltonian_label):
                 index2 = str((i+1,j))
                 coef.append(J_down[i,j])
                 ops.append(qml.PauliZ(index1)@qml.PauliZ(index2))
+
+    elif hamiltonian_label == 'transverse field ising':
+
+        # Z-Z interactions
+        for i in range(dim_grid[0]):
+            for j in range(dim_grid[1]-1):
+                index1 = str((i,j))
+                index2 = str((i,j+1))
+                coef.append(J_right[i,j])
+                ops.append(qml.PauliZ(index1)@qml.PauliZ(index2))
+
+        for i in range(dim_grid[0]-1):
+            for j in range(dim_grid[1]):
+                index1 = str((i,j))
+                index2 = str((i+1,j))
+                coef.append(J_down[i,j])
+                ops.append(qml.PauliZ(index1)@qml.PauliZ(index2))
+
+        # Transverse field X terms
+        # Define the transverse field acting with the same strength in all qubits  of the grid
+        h_field = parameters.h_field
+
+        for i in range(dim_grid[0]):
+            for j in range(dim_grid[1]):
+                index = str((i,j))
+                coef.append(h_field)
+                ops.append(qml.PauliX(index))
 
 
     hamiltonian = qml.Hamiltonian(coef, ops)

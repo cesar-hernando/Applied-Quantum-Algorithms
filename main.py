@@ -9,8 +9,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pennylane as qml
 import pandas as pd
+
 import functions
 from SA_VQE import SA_VQE_expec_val
+import parameters
 
 # Select the mode of the program: 
 # A) basic test to test the performance of VQE and generate correlation matrix 
@@ -82,6 +84,7 @@ if mode == 'A': # Quick testing
     plt.tight_layout()
     plt.show()
 
+    # Print the ground state energy obtained by diagonalization with numpy and with VQE
     print("Ground state energy [Diagonalization] = ", ground_state_energy_diag)
     print("Ground state energies [VQE] = ", ground_state_energies_VQE)
     print(f"Average = {np.mean(ground_state_energies_VQE)}, Standard deviation = {np.std(ground_state_energies_VQE)}")
@@ -93,25 +96,21 @@ elif mode == 'B': # Generating dataset and training ML models
     ##### Definition of parameters and generation of the data using diagonalization (with numpy) and VQE #####
     ##########################################################################################################
 
-    # General parameters
-    dim_grid = (2,2)
-    obs_name = 'correlation'
-    qubits = ((0,0), (0,1))
-    hamiltonian_label = 'ising'
+    # Retrieve parameters from parameters file
 
-    # Training parameters
-    num_examples = 100
+    # First, general parameters
+    dim_grid, obs_name, qubits, hamiltonian_label = parameters.dim_grid, parameters.obs_name, parameters.qubits, parameters.hamiltonian_label
 
-    # VQE parameters
-    depth = 3
-    opt_steps = 500
-    learning_rate = 0.01
+    # Then, Training parameters
+    num_examples = parameters.num_examples
+
+    # Next, VQE parameters
+    depth, opt_steps, learning_rate = parameters.delta, parameters.opt_steps, parameters.learning_rate
     
-    # Random fourier map parameters
-    delta = 1
-    gamma = 0.6
-    R = 10
+    # Finally, Random fourier map parameters
+    delta, gamma, R = parameters.delta, parameters.gamma, parameters.R
     
+
     # Generate datasets and perform feature mapping of the inputs
     X, PhiX_quantum_diag, PhiX_quantum_VQE, PhiX_fourier, Y_diag, Y_VQE = functions.generate_training_set(dim_grid, hamiltonian_label, num_examples, obs_name, qubits, depth=depth, opt_steps=opt_steps, learning_rate=learning_rate, delta=delta, gamma = gamma, R=R)
     print("\nData set generated")
