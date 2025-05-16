@@ -5,11 +5,12 @@ In this paper, we perform the fourier feature map described in Ref 3, which is u
 import numpy as np
 import functions
 
+
 def get_local_edges(input_edge, dim_grid, delta=1):
-    """
-    Return all lattice edges within L1 distance `delta` from the midpoint of `input_edge`,
-    separated into horizontal and vertical edges, organized as 2D arrays.
-    """
+    '''
+    Fill doc-string
+    '''
+
     rows, cols = dim_grid
 
     def edge_midpoint(edge):
@@ -52,12 +53,19 @@ def get_local_edges(input_edge, dim_grid, delta=1):
     return local_horizontal, local_vertical
 
 
+
 def generate_local_couplings(J_right, J_down, local_h, local_v):
+    '''
+    Fill doc-string
+    '''
+
     J_right_local = J_right[local_h]
     J_down_local = J_down[local_v]
     z = np.concatenate((J_right_local, J_down_local))
 
     return z
+
+
 
 def random_fourier_feature_map(Z, w, gamma, R):
     l = len(Z)

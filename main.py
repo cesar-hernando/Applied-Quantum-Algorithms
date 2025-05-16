@@ -8,12 +8,18 @@ In this file, we train a Machine Learning (ML) model to learn to predict propert
 import numpy as np
 import matplotlib.pyplot as plt
 import pennylane as qml
+import pandas as pd
 import functions
 from SA_VQE import SA_VQE_expec_val
 
-mode = 'training'
+# Select the mode of the program: 
+# A) basic test to test the performance of VQE and generate correlation matrix 
+# B) Generate training data set (including performing feature map (both quantum and classical model))
+# C) Train and test different ML models
 
-if mode == 'basic_test':
+mode = 'C'
+
+if mode == 'A': # Quick testing
     # Set the number of qubits in each row/column of the square grid
     dim_grid = (2,2)
     num_qubits = dim_grid[0]*dim_grid[1]
@@ -22,15 +28,10 @@ if mode == 'basic_test':
     seed = 42
     J_right, J_down = functions.generate_couplings(dim_grid, seed)
 
-    # Visualize the lattice with the randomly generated couplings
-    visualize = False
-    if visualize:
-        functions.visualize_couplings(dim_grid, J_right, J_down)
-
     # Obtain the Hamiltonian (qml.Hamiltonian) of the 2D Antiferromagnetic lattice
     hamiltonian = functions.hamiltonian(dim_grid, J_right, J_down)
 
-    # Define the observable by its name and qubits it affects
+    # Define the observable by its name and the qubits it affects
     # Options: obs_name = 'correlation', qubits = (q0, q1)
     obs_name = 'correlation'
 
@@ -46,7 +47,7 @@ if mode == 'basic_test':
             obs = functions.observable(dim_grid, obs_name, (q0, q1))
 
             # Obtain ground state property by diagonalization
-            obs_diag, ground_state_energy_diag = functions.ground_state_expectation_value(dim_grid, hamiltonian, obs)
+            obs_diag, _, ground_state_energy_diag = functions.ground_state_expectation_value(dim_grid, hamiltonian, obs)
             correlations_matrix_diag[i, j] = obs_diag
             correlations_matrix_diag[j, i] = obs_diag
             #print(f"Expectation value of {obs_name} [Diagonalization]= {obs_diag}")
@@ -56,12 +57,11 @@ if mode == 'basic_test':
             depth = 3
             opt_steps = 500
             learning_rate = 0.01
-            obs_SA_VQE, ground_state_energy_VQE = SA_VQE_expec_val(dim_grid, hamiltonian, obs, depth, opt_steps, learning_rate)
+            obs_SA_VQE, _, ground_state_energy_VQE = SA_VQE_expec_val(dim_grid, hamiltonian, obs, depth, opt_steps, learning_rate)
             correlations_matrix_SA_VQE[i, j] = obs_SA_VQE
             correlations_matrix_SA_VQE[j, i] = obs_SA_VQE
             #print(f"Expectation value of {obs_name} [VQE]= {obs_SA_VQE}")
             #print(f'Ground state energy [VQE] = {ground_state_energy_VQE}')
-
     
     # Plot the heatmaps
     fig, axs = plt.subplots(1, 2, figsize=(10, 4))
@@ -84,9 +84,9 @@ if mode == 'basic_test':
     plt.show()
   
 
-elif mode == 'training':
+elif mode == 'B': # Generating dataset
     # General parameters
-    dim_grid = (2,5)
+    dim_grid = (2,2)
     obs_name = 'correlation'
     qubits = ((0,0), (0,1))
 
@@ -102,18 +102,22 @@ elif mode == 'training':
     # Random fourier map parameters
     delta = 1
     gamma = 0.6
-    R = 20
+    R = 10
     
+    # Generate datasets and perform feature mapping of the inputs
     _, PhiX_quantum, _, y_quantum = functions.generate_training_set(dim_grid, num_examples, obs_name, qubits, mode='quantum', depth=depth, opt_steps=opt_steps, learning_rate=learning_rate)
     X, _, PhiX_fourier, y_classical = functions.generate_training_set(dim_grid, num_examples, obs_name, qubits, mode='fourier', delta=delta, gamma = gamma, R=R)
     print("\nData set generated")
+    #df = pd.DataFrame(list(zip(n_bits,tiempo_clas_lista,tiempo_grov_lista)), columns=["nº bits", "tiempo clasico", "tiempo grover"])
+    #path = f'C:/Users/a929493\OneDrive - Eviden/Documentos/Grover_vs_classic/{device}/execution_time_comparison_{device}_{n_bits_max}_bits_1iter.csv'
+    #df.to_csv(path)
 
     
     # Train the model with neural network
     print('\nNeural Network\n')
     functions.neural_network(X, y_classical)
     
-
+    
     # Train the model classically (generation of expectation values classically) and with LASSO regression
     # Without feature map
     coefficients, L1_norm_coef, optimal_alpha, train_mse, test_mse, train_r2, test_r2 = functions.lasso_regression(X, y_classical)
@@ -141,6 +145,7 @@ elif mode == 'training':
     print(f"Optimal alpha: {optimal_alpha}")
     print(f'MSE: training -> {train_mse}; test -> {test_mse}')
     print(f'R^2: training -> {train_r2}; test -> {test_r2}')
+
    
     
 

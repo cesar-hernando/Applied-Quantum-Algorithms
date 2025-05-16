@@ -4,16 +4,20 @@ In this file, I will define the necessary subroutines for the main file
 
 import numpy as np
 import matplotlib.pyplot as plt
-from typing import Optional
+import matplotlib.cm as cm
+import matplotlib.colors as mcolors
 import pennylane as qml
 import networkx as nx
 from sklearn.linear_model import LassoCV
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 import tensorflow as tf
-from tensorflow.keras.losses import MeanSquaredError
+
 from SA_VQE import SA_VQE_expec_val
-import fourier_fm
+import fourier_feature_map
+
+
+
 
 
 def generate_couplings(dim_grid, seed=None):
@@ -48,55 +52,77 @@ def generate_couplings(dim_grid, seed=None):
 
     return J_right, J_down
 
+
+
 def visualize_couplings(dim_grid, J_right, J_down):
     '''
-    Generates a plot to visualize the value of the couplings between spins
+    Visualizes the couplings between spins in a 2D grid, with values ranging from -1 to 1.
 
     Inputs
     -------
     dim_grid: tuple
-        Contains the number of rows and columns of the rectangular spin lattice
+        Number of rows and columns (rows, columns)
 
     J_right: np.ndarray
-        Horizontal couplings
-        Dimension dim_grid[0] x (dim_grid[1]-1)
+        Horizontal couplings, shape (rows, columns - 1)
 
     J_down: np.ndarray
-        Vertical couplings
-        Dimension (dim_grid[0]-1) x dim_grid[1]
+        Vertical couplings, shape (rows - 1, columns)
     '''
+
     rows, columns = dim_grid
     G = nx.Graph()
     pos = {}
 
+    # Create color map (blue to white to red)
+    cmap = cm.seismic
+    norm = mcolors.Normalize(vmin=-1, vmax=1)
+
     # Add nodes and positions
     for i in range(rows):
         for j in range(columns):
-            qubit = (i,j)
+            qubit = (i, j)
             G.add_node(qubit)
-            pos[qubit] = (j,-i)
+            pos[qubit] = (j, -i)
 
-    # Add horizontal edges from J_right
+    # Add horizontal edges with weight/color
     for i in range(rows):
-        for j in range(columns-1):
-            q1 = (i,j)
-            q2 = (i,j+1)
-            sign = J_right[i,j]
-            G.add_edge(q1, q2, color='red' if sign==1 else 'blue', weight=sign)
+        for j in range(columns - 1):
+            q1 = (i, j)
+            q2 = (i, j + 1)
+            value = J_right[i, j]
+            G.add_edge(q1, q2, weight=value, color=cmap(norm(value)))
 
-    # Ad vertical edges from J_down
+    # Add vertical edges with weight/color
     for i in range(rows - 1):
         for j in range(columns):
             q1 = (i, j)
             q2 = (i + 1, j)
-            sign = J_down[i, j]
-            G.add_edge(q1, q2, color='red' if sign == 1 else 'blue', weight=sign)
+            value = J_down[i, j]
+            G.add_edge(q1, q2, weight=value, color=cmap(norm(value)))
 
-    # Draw the network
+    # Extract edge attributes
     edge_colors = [G[u][v]['color'] for u, v in G.edges()]
-    nx.draw(G, pos, with_labels=True, node_color='lightgray', edge_color=edge_colors, node_size=700, width=2)
-    plt.title("2D Spin Grid with Coupling Signs\nRed: +1 (ferromagnetic), Blue: −1 (antiferromagnetic)")
-    plt.axis('off')
+    edge_labels = {(u, v): f"{G[u][v]['weight']:.2f}" for u, v in G.edges()}
+    edge_widths = [2 for _ in G.edges()]  # Optional: could scale with abs(weight)
+
+    # Create figure and axis
+    fig, ax = plt.subplots()
+
+    # Draw graph
+    nx.draw(
+        G, pos, with_labels=True, node_color='lightgray',
+        edge_color=edge_colors, width=edge_widths, node_size=700, ax=ax
+    )
+    nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=8, ax=ax)
+
+    # Add colorbar
+    sm = cm.ScalarMappable(cmap=cmap, norm=norm)
+    sm.set_array([])
+    fig.colorbar(sm, ax=ax, label="Coupling Strength (J)")
+
+    ax.set_title("2D Spin Grid with Coupling Values (−1 to +1)")
+    ax.axis('off')
     plt.show()
 
 
@@ -175,8 +201,6 @@ def observable(dim_grid, obs_name, qubits):
         
     '''
 
-    n_qubits = dim_grid[0]*dim_grid[1]
-
     if obs_name == 'correlation':
         # Define the observable to measure: the correlation function between qubits 0 and 1
         coefs = [1/3]
@@ -223,7 +247,6 @@ def ground_state_expectation_value(dim_grid, hamiltonian, observable):
 
     # Diagonalize the Hamiltonian to find the ground state
     eigenvalues, eigenvectors = np.linalg.eigh(H_matrix)
-
     ground_state_energy = eigenvalues[0]
     ground_state = eigenvectors[:,0]
 
@@ -244,7 +267,7 @@ def ground_state_expectation_value(dim_grid, hamiltonian, observable):
 
 
 
-def generate_training_set(dim_grid, num_examples, observable_name, qubits, mode, depth=None, opt_steps=None, learning_rate=None, delta=None, gamma=None, R=None):
+def generate_training_set(dim_grid, num_examples, observable_name, qubits, depth=None, opt_steps=None, learning_rate=None, delta=None, gamma=None, R=None):
     '''
     Generate the training set for the model
 
@@ -272,38 +295,48 @@ def generate_training_set(dim_grid, num_examples, observable_name, qubits, mode,
         
     ''' 
     
+    # Obtain observable from its name and the qubits it acts on
     obs = observable(dim_grid, observable_name, qubits)
-    J_len = int(2*dim_grid[0]*dim_grid[1] - dim_grid[0] - dim_grid[1])  # Number of couplings = len(J_right) + len(J_down)
-    X = np.zeros((num_examples, J_len))
-    PhiX_quantum = np.zeros((num_examples, len(obs.ops[0])))
-    Y = np.zeros(num_examples)
 
-    if mode == 'fourier':
-        local_right_edges, local_down_edges = fourier_fm.get_local_edges(qubits, dim_grid, delta)
-        w = np.random.normal(0, 1, R)
-        PhiX_fourier = np.zeros((num_examples, ((np.sum(local_right_edges)+np.sum(local_down_edges))*2*R)))
-    elif mode == 'quantum':
-        PhiX_fourier = False
+    # Initialize the inputs and ouputs of the ML model
+    J_len = int(2*dim_grid[0]*dim_grid[1] - dim_grid[0] - dim_grid[1])      # Number of couplings = len(J_right) + len(J_down)
+    X = np.zeros((num_examples, J_len))                                     # Matrix of dimension: num_examples x number of couplings (J_{ij} flattened)
+    Y_diag = np.zeros(num_examples)                                         # Column with the ground state expectation value of obs (obtained with diagonalization)
+    Y_VQE = np.zeros(num_examples)                                          # Column with the ground state expectation value of obs (obtained with VQE)
+
+    # Initialize Quantum Feature Map
+    PhiX_quantum_diag = np.zeros((num_examples, len(obs.ops[0])))           # Matrix of dimension: num_examples x number of Pauli strings in obs (by diagonalization)
+    PhiX_quantum_VQE = np.zeros((num_examples, len(obs.ops[0])))            # Matrix of dimension: num_examples x number of Pauli strings in obs (by VQE)
     
-
+    # Initialize Random Fourier Feature Map
+    local_right_edges, local_down_edges = fourier_feature_map.get_local_edges(qubits, dim_grid, delta)      # Binary strings encoding the local edges
+    w = np.random.normal(0, 1, R)                                                                           # Random vector of ewights for Fourier feature map
+    PhiX_fourier = np.zeros((num_examples, ((np.sum(local_right_edges) + np.sum(local_down_edges))*2*R)))   # Matrix of dimension num_examples x (number of local edges)*2R
+    
+    # Generate feature maps and outputs for each examples
     for l in range(num_examples):
+        # Generate random couplings, flatten them out and concatenate them to generate the input of the ML model
         J_right, J_down = generate_couplings(dim_grid)
         J_right_flat = J_right.flatten()
         J_down_flat = J_down.flatten()
         X[l,:] = np.concatenate((J_right_flat, J_down_flat))
-        if mode == 'classical':
-            Y[l], PhiX_quantum[l,:], _ = ground_state_expectation_value(dim_grid, hamiltonian(dim_grid, J_right, J_down), obs)
-        elif mode == 'quantum':
-            Y[l], PhiX_quantum[l,:], _ = SA_VQE_expec_val(dim_grid, hamiltonian(dim_grid, J_right, J_down), obs, depth, opt_steps, learning_rate)
-        elif mode == 'fourier':
-            Y[l], _, _ = ground_state_expectation_value(dim_grid, hamiltonian(dim_grid, J_right, J_down), obs)
-            Z = fourier_fm.generate_local_couplings(J_right, J_down, local_right_edges, local_down_edges)
-            PhiX_fourier[l,:] = fourier_fm.random_fourier_feature_map(Z, w, gamma, R)
 
-    return X, PhiX_quantum, PhiX_fourier, Y
+        # Obtain output and Quantum Feature map by diagonalization and VQE
+        Y_diag[l], PhiX_quantum_diag[l,:], _ = ground_state_expectation_value(dim_grid, hamiltonian(dim_grid, J_right, J_down), obs)
+        Y_VQE[l], PhiX_quantum_VQE[l,:], _ = SA_VQE_expec_val(dim_grid, hamiltonian(dim_grid, J_right, J_down), obs, depth, opt_steps, learning_rate)
+
+        # Obtain the random Fourier feature map
+        Z = fourier_feature_map.generate_local_couplings(J_right, J_down, local_right_edges, local_down_edges)
+        PhiX_fourier[l,:] = fourier_feature_map.random_fourier_feature_map(Z, w, gamma, R)
+
+    return X, PhiX_quantum_diag, PhiX_quantum_VQE,  PhiX_fourier, Y_diag, Y_VQE
+
 
 
 def lasso_regression(X, y):
+    '''
+    Fill doc-string
+    '''
     # Split the dataset in training and test sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
@@ -328,6 +361,9 @@ def lasso_regression(X, y):
 
 
 def neural_network(X,y):
+    '''
+    Fill doc-string
+    '''
     # Split the dataset in training and test sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     X_test, X_val, y_test, y_val = train_test_split(X_test, y_test, test_size=0.5, random_state=42)
@@ -338,7 +374,7 @@ def neural_network(X,y):
     tf.random.set_seed(seed)
     
     model = tf.keras.Sequential(([
-        tf.keras.layers.Input(dim_input),
+        tf.keras.layers.Input(shape=(dim_input,)),
         tf.keras.layers.Dense(8, activation="relu"),
         tf.keras.layers.Dense(16, activation="relu"),
         tf.keras.layers.Dense(8, activation="relu"),
@@ -347,14 +383,18 @@ def neural_network(X,y):
     
     # Set the optimizer and loss function
     opt = tf.keras.optimizers.Adam(learning_rate=1e-2)
-    model.compile(optimizer=opt, loss=MeanSquaredError())
+    model.compile(optimizer=opt, loss='mse')
+
     # Set an early stopping criteria using validation loss
     #early_stop = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=20, min_delta=0.00001)
+
     # Train the model
     #history = model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=100, batch_size=int(num_examples/5), callbacks=[early_stop])
     history = model.fit(X_train, y_train, validation_data=(X_val, y_val), batch_size=int(num_examples/5), epochs=100)
+
     # Compute the output of the model on the test data
     output = model.predict(X_test)
+
     # Calculate and print the accuracy
     print(f"r2 score on test data = {r2_score(output, y_test)}")
     print(f"Mean squared error on test data = {mean_squared_error(output, y_test)}")

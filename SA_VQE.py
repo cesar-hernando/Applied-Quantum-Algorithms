@@ -98,7 +98,6 @@ def SA_VQE_expec_val(dim_grid, hamiltonian, observable, depth, opt_steps, learni
         return params
 
 
-    #params_initial = np.random.uniform(-np.pi, np.pi, size=(3*depth, n_qubits), requires_grad=True)
     params_initial = np.random.uniform(-np.pi, np.pi, size=(3*depth, n_qubits))
     params_final = optimizer(params_initial)
 
