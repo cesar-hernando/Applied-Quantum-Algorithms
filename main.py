@@ -23,13 +23,14 @@ if mode == 'A': # Quick testing
     # Set the number of qubits in each row/column of the square grid
     dim_grid = (2,2)
     num_qubits = dim_grid[0]*dim_grid[1]
+    hamiltonian_label = 'heisenberg'
 
     # Generate the coupling coefficients
     seed = 42
     J_right, J_down = functions.generate_couplings(dim_grid, seed)
 
     # Obtain the Hamiltonian (qml.Hamiltonian) of the 2D Antiferromagnetic lattice
-    hamiltonian = functions.hamiltonian(dim_grid, J_right, J_down)
+    hamiltonian = functions.hamiltonian(dim_grid, J_right, J_down, hamiltonian_label)
 
     # Define the observable by its name and the qubits it affects
     # Options: obs_name = 'correlation', qubits = (q0, q1)
@@ -89,6 +90,7 @@ elif mode == 'B': # Generating dataset
     dim_grid = (2,2)
     obs_name = 'correlation'
     qubits = ((0,0), (0,1))
+    hamiltonian_label = 'heisenberg'
 
     # Training parameters
     num_examples = 100
@@ -105,8 +107,8 @@ elif mode == 'B': # Generating dataset
     R = 10
     
     # Generate datasets and perform feature mapping of the inputs
-    _, PhiX_quantum, _, y_quantum = functions.generate_training_set(dim_grid, num_examples, obs_name, qubits, mode='quantum', depth=depth, opt_steps=opt_steps, learning_rate=learning_rate)
-    X, _, PhiX_fourier, y_classical = functions.generate_training_set(dim_grid, num_examples, obs_name, qubits, mode='fourier', delta=delta, gamma = gamma, R=R)
+    _, PhiX_quantum, _, y_quantum = functions.generate_training_set(dim_grid, hamiltonian_label, num_examples, obs_name, qubits, mode='quantum', depth=depth, opt_steps=opt_steps, learning_rate=learning_rate)
+    X, _, PhiX_fourier, y_classical = functions.generate_training_set(dim_grid, hamiltonian_label, num_examples, obs_name, qubits, mode='fourier', delta=delta, gamma = gamma, R=R)
     print("\nData set generated")
     #df = pd.DataFrame(list(zip(n_bits,tiempo_clas_lista,tiempo_grov_lista)), columns=["nº bits", "tiempo clasico", "tiempo grover"])
     #path = f'C:/Users/a929493\OneDrive - Eviden/Documentos/Grover_vs_classic/{device}/execution_time_comparison_{device}_{n_bits_max}_bits_1iter.csv'

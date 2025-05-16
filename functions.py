@@ -12,6 +12,7 @@ from sklearn.linear_model import LassoCV
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 import tensorflow as tf
+from tensorflow.keras import regularizers
 
 from SA_VQE import SA_VQE_expec_val
 import fourier_feature_map
@@ -127,7 +128,7 @@ def visualize_couplings(dim_grid, J_right, J_down):
 
 
 
-def hamiltonian(dim_grid, J_right, J_down):
+def hamiltonian(dim_grid, J_right, J_down, hamiltonian_label):
     '''
     Computes the Hamiltonian of a 2D antiferromagnetic system of N spins
 
@@ -143,6 +144,9 @@ def hamiltonian(dim_grid, J_right, J_down):
     J_down: np.ndarray
         Vertical couplings
         Dimension (n-1) x n
+
+    hamiltonian_label: str
+        Identifier of the Hamiltonian: 'heisenberg', 'ising'
     
     Output
     ------
@@ -154,27 +158,44 @@ def hamiltonian(dim_grid, J_right, J_down):
     coef = []
     ops = []
 
-    
-    # Fill the horizontal interactions
-    for i in range(dim_grid[0]):
-        for j in range(dim_grid[1]-1):
-            index1 = str((i,j))
-            index2 = str((i,j+1))
-            coef.append(J_right[i,j])
-            ops.append(qml.PauliX(index1)@qml.PauliX(index2) + qml.PauliY(index1)@qml.PauliY(index2) + qml.PauliZ(index1)@qml.PauliZ(index2))
-            #ops.append(qml.PauliZ(index1)@qml.PauliZ(index2))
+    if hamiltonian_label == 'heisenberg':
+        # Fill the horizontal interactions
+        for i in range(dim_grid[0]):
+            for j in range(dim_grid[1]-1):
+                index1 = str((i,j))
+                index2 = str((i,j+1))
+                coef.append(J_right[i,j])
+                ops.append(qml.PauliX(index1)@qml.PauliX(index2) + qml.PauliY(index1)@qml.PauliY(index2) + qml.PauliZ(index1)@qml.PauliZ(index2))
+                #ops.append(qml.PauliZ(index1)@qml.PauliZ(index2))
 
-    # Fill the vertical interactions
-    for i in range(dim_grid[0]-1):
-        for j in range(dim_grid[1]):
-            index1 = str((i,j))
-            index2 = str((i+1,j))
-            coef.append(J_down[i,j])
-            ops.append(qml.PauliX(index1)@qml.PauliX(index2) + qml.PauliY(index1)@qml.PauliY(index2) + qml.PauliZ(index1)@qml.PauliZ(index2))
-            #ops.append(qml.PauliZ(index1)@qml.PauliZ(index2))
+        # Fill the vertical interactions
+        for i in range(dim_grid[0]-1):
+            for j in range(dim_grid[1]):
+                index1 = str((i,j))
+                index2 = str((i+1,j))
+                coef.append(J_down[i,j])
+                ops.append(qml.PauliX(index1)@qml.PauliX(index2) + qml.PauliY(index1)@qml.PauliY(index2) + qml.PauliZ(index1)@qml.PauliZ(index2))
+                #ops.append(qml.PauliZ(index1)@qml.PauliZ(index2))
+
+    elif hamiltonian_label == 'ising':
+        # Fill the horizontal interactions
+        for i in range(dim_grid[0]):
+            for j in range(dim_grid[1]-1):
+                index1 = str((i,j))
+                index2 = str((i,j+1))
+                coef.append(J_right[i,j])
+                ops.append(qml.PauliZ(index1)@qml.PauliZ(index2))
+
+        # Fill the vertical interactions
+        for i in range(dim_grid[0]-1):
+            for j in range(dim_grid[1]):
+                index1 = str((i,j))
+                index2 = str((i+1,j))
+                coef.append(J_down[i,j])
+                ops.append(qml.PauliZ(index1)@qml.PauliZ(index2))
+
 
     hamiltonian = qml.Hamiltonian(coef, ops)
-    
 
     return hamiltonian
 
@@ -267,7 +288,7 @@ def ground_state_expectation_value(dim_grid, hamiltonian, observable):
 
 
 
-def generate_training_set(dim_grid, num_examples, observable_name, qubits, depth=None, opt_steps=None, learning_rate=None, delta=None, gamma=None, R=None):
+def generate_training_set(dim_grid, hamiltonian_label, num_examples, observable_name, qubits, depth=None, opt_steps=None, learning_rate=None, delta=None, gamma=None, R=None):
     '''
     Generate the training set for the model
 
@@ -275,6 +296,9 @@ def generate_training_set(dim_grid, num_examples, observable_name, qubits, depth
     ------
     dim_grid: tuple
         Contains the number of rows and columns of the rectangular spin lattice
+    
+    hamiltonian_label: str
+        Identifier of the Hamiltonian: 'heisenberg', 'ising'
 
     num_examples: int
        Number of training examples |{x^l={J_{ij}^l, y^l}|
@@ -322,7 +346,7 @@ def generate_training_set(dim_grid, num_examples, observable_name, qubits, depth
         X[l,:] = np.concatenate((J_right_flat, J_down_flat))
 
         # Obtain output and Quantum Feature map by diagonalization and VQE
-        Y_diag[l], PhiX_quantum_diag[l,:], _ = ground_state_expectation_value(dim_grid, hamiltonian(dim_grid, J_right, J_down), obs)
+        Y_diag[l], PhiX_quantum_diag[l,:], _ = ground_state_expectation_value(dim_grid, hamiltonian(dim_grid, J_right, J_down, hamiltonian_label), obs)
         Y_VQE[l], PhiX_quantum_VQE[l,:], _ = SA_VQE_expec_val(dim_grid, hamiltonian(dim_grid, J_right, J_down), obs, depth, opt_steps, learning_rate)
 
         # Obtain the random Fourier feature map
@@ -360,42 +384,77 @@ def lasso_regression(X, y):
     return coefficients, L1_norm_coef, optimal_alpha, train_mse, test_mse, train_r2, test_r2
 
 
-def neural_network(X,y):
+def neural_network(X, y):
     '''
-    Fill doc-string
+    Trains a feedforward neural network on the provided dataset, with regularization,
+    early stopping, and plots of training vs validation loss.
+
+    Inputs:
+    -------
+    X : np.ndarray
+        Input features
+    y : np.ndarray
+        Target values
     '''
-    # Split the dataset in training and test sets
+
+    # Split dataset: 80% train, 10% val, 10% test
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    X_test, X_val, y_test, y_val = train_test_split(X_test, y_test, test_size=0.5, random_state=42)
-    dim_input = X_test.shape[1]
-    num_examples = X_test.shape[0]
-    # Define the model
+    X_val, X_test, y_val, y_test = train_test_split(X_test, y_test, test_size=0.5, random_state=42)
+
+    dim_input = X.shape[1]
+    num_examples = X_train.shape[0]
+
+    # Set seed for reproducibility
     seed = 42
     tf.random.set_seed(seed)
-    
-    model = tf.keras.Sequential(([
+
+    # Define the model
+    model = tf.keras.Sequential([
         tf.keras.layers.Input(shape=(dim_input,)),
         tf.keras.layers.Dense(8, activation="relu"),
+        tf.keras.layers.Dropout(0.2),
         tf.keras.layers.Dense(16, activation="relu"),
+        tf.keras.layers.Dense(16, activation="relu"),
+        tf.keras.layers.Dropout(0.2),
         tf.keras.layers.Dense(8, activation="relu"),
         tf.keras.layers.Dense(1, activation=None)
-        ]))
-    
-    # Set the optimizer and loss function
+    ])
+
+    # Compile the model
     opt = tf.keras.optimizers.Adam(learning_rate=1e-2)
     model.compile(optimizer=opt, loss='mse')
 
-    # Set an early stopping criteria using validation loss
-    #early_stop = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience=20, min_delta=0.00001)
+    # Early stopping
+    early_stop = tf.keras.callbacks.EarlyStopping(
+        monitor="val_loss",
+        patience=10,
+        restore_best_weights=True
+    )
 
     # Train the model
-    #history = model.fit(X_train, y_train, validation_data=(X_val, y_val), epochs=100, batch_size=int(num_examples/5), callbacks=[early_stop])
-    history = model.fit(X_train, y_train, validation_data=(X_val, y_val), batch_size=int(num_examples/5), epochs=100)
+    history = model.fit(
+        X_train, y_train,
+        validation_data=(X_val, y_val),
+        batch_size=max(1, int(num_examples / 10)),
+        epochs=100,
+        callbacks=[early_stop],
+        verbose=0
+    )
 
-    # Compute the output of the model on the test data
+    # Evaluate on test data
     output = model.predict(X_test)
+    print(f"r2 score on test data = {r2_score(y_test, output):.4f}")
+    print(f"Mean squared error on test data = {mean_squared_error(y_test, output):.4f}")
 
-    # Calculate and print the accuracy
-    print(f"r2 score on test data = {r2_score(output, y_test)}")
-    print(f"Mean squared error on test data = {mean_squared_error(output, y_test)}")
+    # Plot training vs validation loss
+    plt.figure(figsize=(7, 5))
+    plt.plot(history.history['loss'], label='Training Loss')
+    plt.plot(history.history['val_loss'], label='Validation Loss')
+    plt.title('Training and Validation Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss (MSE)')
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+    plt.show()
     
