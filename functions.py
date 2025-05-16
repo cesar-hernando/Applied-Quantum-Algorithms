@@ -1,5 +1,6 @@
 '''
-In this file, I will define the necessary subroutines for the main file
+In this file, I will define subroutines use to generate random couplings, solve the ground state by numpy diagonalization, generate the training set,
+perform LASSO regression and implement a custom neural network
 '''
 
 import numpy as np
@@ -290,7 +291,7 @@ def ground_state_expectation_value(dim_grid, hamiltonian, observable):
 
 def generate_training_set(dim_grid, hamiltonian_label, num_examples, observable_name, qubits, depth=None, opt_steps=None, learning_rate=None, delta=None, gamma=None, R=None):
     '''
-    Generate the training set for the model
+    Generate the training set for the model, including feature map and output (ground state expectation value of observable)
 
     Inputs
     ------
@@ -306,16 +307,53 @@ def generate_training_set(dim_grid, hamiltonian_label, num_examples, observable_
     observable_name: str
         Name/identification of the k-local observable whose ground state expectation value we want to evaluate
 
-    mode: str
-        Name ('quantum' or 'classical') that identifies how we want to calculate the expectation values of the observable in the ground state
+    qubits: tuple of 2 tuples
+        Tuple of the coordinates of the two qubits where the correlation observable acts on
+    
+    depth: int
+        Depth of the hardware-efficient VQE
 
-    Output
-    ------
+    opt_steps: int
+        Number of optimization steps for VQE
+
+    learning_rate: float
+        Learning rate/gradient descent step size for Adam optimizer in VQE
+
+    delta: int
+        Maximum Manhattan distance for selecting edges close to the region where the observable acts on
+
+    gamma: float
+        Hyperparameter (related to the frequency) of the random Fourier feature map
+    
+    R: int
+        Hyperparameter (related to dimension) of the random Fourier feature map
+    
+    
+    Outputs
+    -------
     X: np.ndarray
         Matrix of dimension num_examples x J_len containing num_examples of the input vector
     
-    Y: np.ndarray
+    PhiX_quantum_diag: np.ndarray
+        Matrix (of dimension num_examples x number of Pauli strings in which the observable can be decomposed in) of the feature map for the quantum model
+        Each element is tr(rho(x)P_i), i.e., expectation value of a Pauli
+        Obtained by diagonalization using numpy
+
+    PhiX_quantum_VQE: np.ndarray
+        Matrix (of dimension num_examples x number of Pauli strings in which the observable can be decomposed in) of the feature map for the quantum model
+        Each element is tr(rho(x)P_i), i.e., expectation value of a Pauli
+        Obtained by VQE
+
+    PhiX_fourier: np.ndarray
+        Matrix {of dimension num_examples x 2R(number of local couplings)} associated with random Fourier feature map
+    
+    Y_diag: np.ndarray
         Vector of length num_examples with the expectation values of the measured observable
+        Obtained by diagonalization with numpy
+
+    Y_VQE: np.ndarray
+        Vector of length num_examples with the expectation values of the measured observable
+        Obtained by VQE
         
     ''' 
     
@@ -347,20 +385,52 @@ def generate_training_set(dim_grid, hamiltonian_label, num_examples, observable_
 
         # Obtain output and Quantum Feature map by diagonalization and VQE
         Y_diag[l], PhiX_quantum_diag[l,:], _ = ground_state_expectation_value(dim_grid, hamiltonian(dim_grid, J_right, J_down, hamiltonian_label), obs)
-        Y_VQE[l], PhiX_quantum_VQE[l,:], _ = SA_VQE_expec_val(dim_grid, hamiltonian(dim_grid, J_right, J_down), obs, depth, opt_steps, learning_rate)
+        Y_VQE[l], PhiX_quantum_VQE[l,:], _ = SA_VQE_expec_val(dim_grid, hamiltonian(dim_grid, J_right, J_down, hamiltonian_label), obs, depth, opt_steps, learning_rate)
 
         # Obtain the random Fourier feature map
         Z = fourier_feature_map.generate_local_couplings(J_right, J_down, local_right_edges, local_down_edges)
         PhiX_fourier[l,:] = fourier_feature_map.random_fourier_feature_map(Z, w, gamma, R)
 
-    return X, PhiX_quantum_diag, PhiX_quantum_VQE,  PhiX_fourier, Y_diag, Y_VQE
+    return X, PhiX_quantum_diag, PhiX_quantum_VQE, PhiX_fourier, Y_diag, Y_VQE
 
 
 
 def lasso_regression(X, y):
     '''
-    Fill doc-string
+    Perform Cross-validation LASSO, trying different hyperparamers (alphas) that represent the importance of the regularization
+
+    Inputs
+    -------
+    X: np.ndarray
+        Matrix of dimension num_examples x number of features
+    
+    Y: np.ndarray
+        Vector of length num_examples
+
+    Outputs
+    -------
+    coefficients: np.ndarray
+        Represent the importance of each feature for the prediction of the output
+    
+    L1_norm_coef: float
+        L1 norm of the vector of the coefficients
+
+    optimal_alpha: float
+        Value of alpha that minimizes the cross validation loss
+
+    train_mse: float
+        Mean squared error in training data
+
+    test_mse: float
+        Mean squared error in test data
+
+    train_r2: float
+        R2 score of training data
+
+    test_r2: float
+        R2 score of test data
     '''
+
     # Split the dataset in training and test sets
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
@@ -389,12 +459,20 @@ def neural_network(X, y):
     Trains a feedforward neural network on the provided dataset, with regularization,
     early stopping, and plots of training vs validation loss.
 
-    Inputs:
+    Inputs
     -------
     X : np.ndarray
-        Input features
+        Input features (perhaps after performing a feature map)
     y : np.ndarray
         Target values
+
+    Outputs
+    --------
+    r2: float
+        R^2 score (typically used to evaluate how good a regression model explains the data)
+    
+    mse: float
+        Mean squared error in the test data
     '''
 
     # Split dataset: 80% train, 10% val, 10% test
@@ -443,8 +521,10 @@ def neural_network(X, y):
 
     # Evaluate on test data
     output = model.predict(X_test)
-    print(f"r2 score on test data = {r2_score(y_test, output):.4f}")
-    print(f"Mean squared error on test data = {mean_squared_error(y_test, output):.4f}")
+    r2 = r2_score(y_test, output)
+    mse = mean_squared_error(y_test, output)
+    print(f"r2 score on test data = {r2:.4f}")
+    print(f"Mean squared error on test data = {mse:.4f}")
 
     # Plot training vs validation loss
     plt.figure(figsize=(7, 5))
@@ -457,4 +537,6 @@ def neural_network(X, y):
     plt.grid(True)
     plt.tight_layout()
     plt.show()
+
+    return r2, mse
     

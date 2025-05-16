@@ -1,7 +1,7 @@
 '''
 Author: Cesar Hernando
 
-In this file, we train a Machine Learning (ML) model to learn to predict properties of a 2D antiferromagnetic system.
+In this file, we train different Machine Learning (ML) models to learn to predict properties of a 2D antiferromagnetic system.
 
 '''
 
@@ -14,16 +14,15 @@ from SA_VQE import SA_VQE_expec_val
 
 # Select the mode of the program: 
 # A) basic test to test the performance of VQE and generate correlation matrix 
-# B) Generate training data set (including performing feature map (both quantum and classical model))
-# C) Train and test different ML models
+# B) Generate training data set (including performing feature map (both quantum and classical model)) and train (and test) different ML models
 
-mode = 'C'
+mode = 'B'
 
 if mode == 'A': # Quick testing
     # Set the number of qubits in each row/column of the square grid
     dim_grid = (2,2)
     num_qubits = dim_grid[0]*dim_grid[1]
-    hamiltonian_label = 'heisenberg'
+    hamiltonian_label = 'ising'
 
     # Generate the coupling coefficients
     seed = 42
@@ -40,6 +39,8 @@ if mode == 'A': # Quick testing
     correlations_matrix_SA_VQE = np.zeros((num_qubits, num_qubits))
 
     qubits = [(i,j) for i in range(dim_grid[0]) for j in range(dim_grid[1])]
+    
+    ground_state_energies_VQE = []
 
     for i, q0 in enumerate(qubits):
         for j, q1 in enumerate(qubits[i+1:], start=i+1):
@@ -48,21 +49,18 @@ if mode == 'A': # Quick testing
             obs = functions.observable(dim_grid, obs_name, (q0, q1))
 
             # Obtain ground state property by diagonalization
-            obs_diag, _, ground_state_energy_diag = functions.ground_state_expectation_value(dim_grid, hamiltonian, obs)
+            obs_diag, ground_state_energy_diag, ground_state_energy_diag = functions.ground_state_expectation_value(dim_grid, hamiltonian, obs)
             correlations_matrix_diag[i, j] = obs_diag
             correlations_matrix_diag[j, i] = obs_diag
-            #print(f"Expectation value of {obs_name} [Diagonalization]= {obs_diag}")
-            #print(f'Ground state energy [Diagonalization] = {ground_state_energy_diag}')
             
             # Obtain ground state property by SA VQE
             depth = 3
             opt_steps = 500
             learning_rate = 0.01
             obs_SA_VQE, _, ground_state_energy_VQE = SA_VQE_expec_val(dim_grid, hamiltonian, obs, depth, opt_steps, learning_rate)
+            ground_state_energies_VQE.append(ground_state_energy_VQE)
             correlations_matrix_SA_VQE[i, j] = obs_SA_VQE
             correlations_matrix_SA_VQE[j, i] = obs_SA_VQE
-            #print(f"Expectation value of {obs_name} [VQE]= {obs_SA_VQE}")
-            #print(f'Ground state energy [VQE] = {ground_state_energy_VQE}')
     
     # Plot the heatmaps
     fig, axs = plt.subplots(1, 2, figsize=(10, 4))
@@ -83,18 +81,26 @@ if mode == 'A': # Quick testing
 
     plt.tight_layout()
     plt.show()
+
+    print("Ground state energy [Diagonalization] = ", ground_state_energy_diag)
+    print("Ground state energies [VQE] = ", ground_state_energies_VQE)
+    print(f"Average = {np.mean(ground_state_energies_VQE)}, Standard deviation = {np.std(ground_state_energies_VQE)}")
   
 
-elif mode == 'B': # Generating dataset
+elif mode == 'B': # Generating dataset and training ML models
+
+    ##########################################################################################################
+    ##### Definition of parameters and generation of the data using diagonalization (with numpy) and VQE #####
+    ##########################################################################################################
+
     # General parameters
     dim_grid = (2,2)
     obs_name = 'correlation'
     qubits = ((0,0), (0,1))
-    hamiltonian_label = 'heisenberg'
+    hamiltonian_label = 'ising'
 
     # Training parameters
     num_examples = 100
-    mode = 'fourier'
 
     # VQE parameters
     depth = 3
@@ -107,31 +113,57 @@ elif mode == 'B': # Generating dataset
     R = 10
     
     # Generate datasets and perform feature mapping of the inputs
-    _, PhiX_quantum, _, y_quantum = functions.generate_training_set(dim_grid, hamiltonian_label, num_examples, obs_name, qubits, mode='quantum', depth=depth, opt_steps=opt_steps, learning_rate=learning_rate)
-    X, _, PhiX_fourier, y_classical = functions.generate_training_set(dim_grid, hamiltonian_label, num_examples, obs_name, qubits, mode='fourier', delta=delta, gamma = gamma, R=R)
+    X, PhiX_quantum_diag, PhiX_quantum_VQE, PhiX_fourier, Y_diag, Y_VQE = functions.generate_training_set(dim_grid, hamiltonian_label, num_examples, obs_name, qubits, depth=depth, opt_steps=opt_steps, learning_rate=learning_rate, delta=delta, gamma = gamma, R=R)
     print("\nData set generated")
-    #df = pd.DataFrame(list(zip(n_bits,tiempo_clas_lista,tiempo_grov_lista)), columns=["nº bits", "tiempo clasico", "tiempo grover"])
-    #path = f'C:/Users/a929493\OneDrive - Eviden/Documentos/Grover_vs_classic/{device}/execution_time_comparison_{device}_{n_bits_max}_bits_1iter.csv'
-    #df.to_csv(path)
+    
+    #######################################################
+    ##### Training and testing of different ML models #####
+    #######################################################
 
+    # 1. Neural network
+    # Train the model with neural network using data obtained by diagonalization and VQE
+
+    print('\nNeural Network [output obtained by diagonalization]:\n')
+    r2_nn_diag, mse_nn_diag = functions.neural_network(X, Y_diag)
+    print('\nNeural Network [output obtained by VQE]:\n')
+    r2_nn_VQE, mse_nn_VQE  = functions.neural_network(X, Y_VQE)
     
-    # Train the model with neural network
-    print('\nNeural Network\n')
-    functions.neural_network(X, y_classical)
     
-    
-    # Train the model classically (generation of expectation values classically) and with LASSO regression
-    # Without feature map
-    coefficients, L1_norm_coef, optimal_alpha, train_mse, test_mse, train_r2, test_r2 = functions.lasso_regression(X, y_classical)
-    print('\nLASSO without feature map')
+    # 2. LASSO regression without feature map using data obtained by diagonalization and VQE
+
+    # With numpy diagonalization
+    coefficients, L1_norm_coef, optimal_alpha, train_mse, test_mse, train_r2, test_r2 = functions.lasso_regression(X, Y_diag)
+    print('\nLASSO without feature map [with diagonalization]')
+    print(f'Coefficients (omega)= {coefficients}')
+    print(f'L1 norm of omega = {L1_norm_coef}')
+    print(f"Optimal alpha: {optimal_alpha}")
+    print(f'MSE: training -> {train_mse}; test -> {test_mse}')
+    print(f'R^2: training -> {train_r2}; test -> {test_r2}')
+
+    # With VQE
+    coefficients, L1_norm_coef, optimal_alpha, train_mse, test_mse, train_r2, test_r2 = functions.lasso_regression(X, Y_VQE)
+    print('\nLASSO without feature map [with VQE]')
     print(f'Coefficients (omega)= {coefficients}')
     print(f'L1 norm of omega = {L1_norm_coef}')
     print(f"Optimal alpha: {optimal_alpha}")
     print(f'MSE: training -> {train_mse}; test -> {test_mse}')
     print(f'R^2: training -> {train_r2}; test -> {test_r2}')
     
-    # With quantum feature map
-    coefficients, L1_norm_coef, optimal_alpha, train_mse, test_mse, train_r2, test_r2 = functions.lasso_regression(PhiX_quantum, y_quantum)
+    # 3. LASSO regression with quantum feature map using data obtained by diagonalization and VQE
+    
+    # With numpy diagonalization
+    print("With diagonalization")
+    coefficients, L1_norm_coef, optimal_alpha, train_mse, test_mse, train_r2, test_r2 = functions.lasso_regression(PhiX_quantum_diag, Y_diag)
+    print('\nLASSO with quantum feature map')
+    print(f'Coefficients (omega)= {coefficients}')
+    print(f'L1 norm of omega = {L1_norm_coef}')
+    print(f"Optimal alpha: {optimal_alpha}")
+    print(f'MSE: training -> {train_mse}; test -> {test_mse}')
+    print(f'R^2: training -> {train_r2}; test -> {test_r2}')
+
+    # With VQE
+    print("With VQE")
+    coefficients, L1_norm_coef, optimal_alpha, train_mse, test_mse, train_r2, test_r2 = functions.lasso_regression(PhiX_quantum_VQE, Y_VQE)
     print('\nLASSO with quantum feature map')
     print(f'Coefficients (omega)= {coefficients}')
     print(f'L1 norm of omega = {L1_norm_coef}')
@@ -139,8 +171,19 @@ elif mode == 'B': # Generating dataset
     print(f'MSE: training -> {train_mse}; test -> {test_mse}')
     print(f'R^2: training -> {train_r2}; test -> {test_r2}')
     
-     # With random fourier map
-    coefficients, L1_norm_coef, optimal_alpha, train_mse, test_mse, train_r2, test_r2 = functions.lasso_regression(PhiX_fourier, y_classical)
+    # 4. LASSO regression with random fourier feature map using data obtained by diagonalization and VQE
+
+    # With numpy diagonalization
+    coefficients, L1_norm_coef, optimal_alpha, train_mse, test_mse, train_r2, test_r2 = functions.lasso_regression(PhiX_fourier, Y_diag)
+    print('\nLASSO with random Fourier feature map')
+    print(f'Coefficients (omega)= {coefficients}')
+    print(f'L1 norm of omega = {L1_norm_coef}')
+    print(f"Optimal alpha: {optimal_alpha}")
+    print(f'MSE: training -> {train_mse}; test -> {test_mse}')
+    print(f'R^2: training -> {train_r2}; test -> {test_r2}')
+
+    # With VQE
+    coefficients, L1_norm_coef, optimal_alpha, train_mse, test_mse, train_r2, test_r2 = functions.lasso_regression(PhiX_fourier, Y_VQE)
     print('\nLASSO with random Fourier feature map')
     print(f'Coefficients (omega)= {coefficients}')
     print(f'L1 norm of omega = {L1_norm_coef}')
