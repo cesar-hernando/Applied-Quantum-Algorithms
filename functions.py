@@ -1,6 +1,6 @@
 '''
 In this file, I will define subroutines use to generate random couplings, solve the ground state by numpy diagonalization, generate the training set,
-perform LASSO regression and implement a custom neural network
+perform LASSO regression and implement a custom neural network. Basically, all functions except the ones involving VQE and random Fourier feature map.
 '''
 
 import numpy as np
@@ -18,9 +18,6 @@ from tensorflow.keras import regularizers
 from SA_VQE import SA_VQE_expec_val
 import fourier_feature_map
 import parameters
-
-
-
 
 
 def generate_couplings(dim_grid, seed=None):
@@ -148,7 +145,7 @@ def hamiltonian(dim_grid, J_right, J_down, hamiltonian_label):
         Dimension (n-1) x n
 
     hamiltonian_label: str
-        Identifier of the Hamiltonian: 'heisenberg', 'ising'
+        Identifier of the Hamiltonian: 'heisenberg', 'ising', 'transverse ising'
     
     Output
     ------
@@ -196,7 +193,7 @@ def hamiltonian(dim_grid, J_right, J_down, hamiltonian_label):
                 coef.append(J_down[i,j])
                 ops.append(qml.PauliZ(index1)@qml.PauliZ(index2))
 
-    elif hamiltonian_label == 'transverse field ising':
+    elif hamiltonian_label == 'transverse ising':
 
         # Z-Z interactions
         for i in range(dim_grid[0]):

@@ -22,9 +22,9 @@ mode = 'B'
 
 if mode == 'A': # Quick testing
     # Set the number of qubits in each row/column of the square grid
-    dim_grid = (2,2)
+    dim_grid = (1,2)
     num_qubits = dim_grid[0]*dim_grid[1]
-    hamiltonian_label = 'ising'
+    hamiltonian_label = 'transverse ising'
 
     # Generate the coupling coefficients
     seed = 42
@@ -46,7 +46,6 @@ if mode == 'A': # Quick testing
 
     for i, q0 in enumerate(qubits):
         for j, q1 in enumerate(qubits[i+1:], start=i+1):
-
     
             obs = functions.observable(dim_grid, obs_name, (q0, q1))
 
