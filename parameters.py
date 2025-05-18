@@ -3,10 +3,10 @@ In this file we define the parameters used for the simulation (both in main.py a
 '''
 
 # General parameters
-dim_grid = (2,3)
+dim_grid = (2,5)
 obs_name = 'correlation'
 qubits = ((0,0), (0,1))
-hamiltonian_label = 'heisenberg'
+hamiltonian_label = 'ising'
 
 # Training parameters
 num_examples = 100
@@ -19,7 +19,7 @@ learning_rate = 0.01
 # Random fourier map parameters
 delta = 1
 gamma = 0.6
-R = 5
+R = 10
 
 # Transverse field strength
 

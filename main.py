@@ -18,7 +18,7 @@ import parameters
 # A) basic test to test the performance of VQE and generate correlation matrix 
 # B) Generate training data set (including performing feature map (both quantum and classical model)) and train (and test) different ML models
 
-mode = 'A'
+mode = 'B'
 
 if mode == 'A': # Quick testing
     # Set the number of qubits in each row/column of the square grid

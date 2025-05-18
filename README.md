@@ -1,11 +1,16 @@
 # Applied-Quantum-Algorithms
  Predicting unknown observables on ground states
 
- In this project I will use a quantum algorithm to solve a ML problem related to quantum many body physics.
+ In this project I will use different supervised learning methods to solve a quantum many body physics problem.
  Specifically, the task is to learn to predict from data expectation values of unknown
- observables on time evolved quantum states under a known Hamiltonian. Alterna
-tively, you can consider the task of learning to predict expectation values on ground
- states of a class of local Hamiltonians. As it will be discussed in the lectures, for
- a special class of Hamiltonians one could show that those tasks exhibit a provable
- learning separation with respect to classical algorithms. In this project, we will
- focus on a class of physically motivated Hamiltonians.
+ observables and predict expectation values on ground states of a class of local Hamiltonians. For this, I will compare different methods:
+ a quantum LASSO regression model that involves executing VQE; a LASSO regression that involves using a random Fourier feature map; a LASSO 
+ regression without any feature map; and a Deep Neural Network.
+
+ In order to train these models and compare their performance, you should set the variable 'mode' in main.py to 'B'. If you want to check how
+ well the estimated ground state energies and observables match with the exact ones obtained by diagonalization, set 'mode' to 'A'. Furthermore, different 
+ parameters such as the lattice size, number of examples and hyperparameters of different models can be changes in the parameters.py file.
+
+ The file SA_VQE.py include the functions related to the VQE algorithm. The fourier_feature_mappy file contains the functions related to the classical
+ LASSO model proposed in Ref. 3. Finally, the functions.py contains the rest of the functions to generate couplings, define hamiltonian and observble,
+ calculate the ground state using numpy diagonalization, generating the training dataset, and defining the ML models.
