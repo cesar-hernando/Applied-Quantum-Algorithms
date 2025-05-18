@@ -18,17 +18,19 @@ import parameters
 # A) basic test to test the performance of VQE and generate correlation matrix 
 # B) Generate training data set (including performing feature map (both quantum and classical model)) and train (and test) different ML models
 
-mode = 'B'
+mode = 'A'
 
 if mode == 'A': # Quick testing
     # Set the number of qubits in each row/column of the square grid
-    dim_grid = (1,2)
+    dim_grid = (2,4)
     num_qubits = dim_grid[0]*dim_grid[1]
-    hamiltonian_label = 'transverse ising'
+    hamiltonian_label = 'heisenberg'
 
     # Generate the coupling coefficients
-    seed = 42
+    seed = 3
     J_right, J_down = functions.generate_couplings(dim_grid, seed)
+    #J_right = np.ones_like(J_right)
+    #J_down = np.ones_like(J_down)
 
     # Obtain the Hamiltonian (qml.Hamiltonian) of the 2D Antiferromagnetic lattice
     hamiltonian = functions.hamiltonian(dim_grid, J_right, J_down, hamiltonian_label)
