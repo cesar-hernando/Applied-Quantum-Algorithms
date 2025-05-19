@@ -13,11 +13,10 @@ from sklearn.linear_model import LassoCV
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error, r2_score
 import tensorflow as tf
-from tensorflow.keras import regularizers
+
 
 from SA_VQE import SA_VQE_expec_val
 import fourier_feature_map
-import parameters
 
 
 def generate_couplings(dim_grid, seed=None):

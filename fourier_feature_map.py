@@ -3,7 +3,6 @@ In this file, we perform the fourier feature map described in Ref 3, which is us
 '''
 
 import numpy as np
-import functions
 
 
 def get_local_edges(input_edge, dim_grid, delta=1):

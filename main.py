@@ -7,8 +7,6 @@ In this file, we train different Machine Learning (ML) models to learn to predic
 
 import numpy as np
 import matplotlib.pyplot as plt
-import pennylane as qml
-import pandas as pd
 
 import functions
 from SA_VQE import SA_VQE_expec_val
@@ -16,7 +14,7 @@ import parameters
 
 # Select the mode of the program: 
 # A) basic test to test the performance of VQE and generate correlation matrix 
-# B) Generate training data set (including performing feature map (both quantum and classical model)) and train (and test) different ML models
+# B) Generate training data set (including performing feature map (both quantum and classical model) and train (and test) different ML models
 
 mode = 'B'
 
@@ -30,8 +28,6 @@ if mode == 'A': # Quick testing
     seed = 3
     J_right, J_down = functions.generate_couplings(dim_grid, seed)
     functions.visualize_couplings(dim_grid, J_right, J_down)
-    #J_right = np.ones_like(J_right)
-    #J_down = np.ones_like(J_down)
 
     # Obtain the Hamiltonian (qml.Hamiltonian) of the 2D Antiferromagnetic lattice
     hamiltonian = functions.hamiltonian(dim_grid, J_right, J_down, hamiltonian_label)
@@ -121,8 +117,7 @@ elif mode == 'B': # Generating dataset and training ML models
     ##### Training and testing of different ML models #####
     #######################################################
 
-    # 1. Neural network
-    # Train the model with neural network using data obtained by diagonalization
+    # 1. Neural network using data obtained by diagonalization
 
     print('\nNeural Network [output obtained by diagonalization]:\n')
     r2_nn_diag, mse_nn_diag = functions.neural_network(X, Y_diag)

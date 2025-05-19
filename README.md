@@ -14,3 +14,5 @@
  The file SA_VQE.py include the functions related to the VQE algorithm. The fourier_feature_mappy file contains the functions related to the classical
  LASSO model proposed in Ref. 3. Finally, the functions.py contains the rest of the functions to generate couplings, define hamiltonian and observble,
  calculate the ground state using numpy diagonalization, generating the training dataset, and defining the ML models.
+
+ The required libraries to run the code are: numpy, matplotlib, pennylane, networkx, sklearn, and tensorflow.
