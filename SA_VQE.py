@@ -1,6 +1,6 @@
 '''
 In this file, I estimate the expectation value of a certain observable in the ground state of the Hamiltonian
-using (Symmetry adapted) VQE
+using the Hardware-efficient VQE
 '''
 
 import pennylane.numpy as np
