@@ -3,10 +3,10 @@ In this file we define the parameters used for the simulation (both in main.py a
 '''
 
 # General parameters
-dim_grid = (2,5)
+dim_grid = (2,2)
 obs_name = 'correlation'
 qubits = ((0,0), (0,1))
-hamiltonian_label = 'ising'
+hamiltonian_label = 'heisenberg'
 
 # Training parameters
 num_examples = 100

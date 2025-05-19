@@ -145,7 +145,7 @@ def hamiltonian(dim_grid, J_right, J_down, hamiltonian_label):
         Dimension (n-1) x n
 
     hamiltonian_label: str
-        Identifier of the Hamiltonian: 'heisenberg', 'ising', 'transverse ising'
+        Identifier of the Hamiltonian: 'heisenberg', 'ising'
     
     Output
     ------
@@ -192,33 +192,6 @@ def hamiltonian(dim_grid, J_right, J_down, hamiltonian_label):
                 index2 = str((i+1,j))
                 coef.append(J_down[i,j])
                 ops.append(qml.PauliZ(index1)@qml.PauliZ(index2))
-
-    elif hamiltonian_label == 'transverse ising':
-
-        # Z-Z interactions
-        for i in range(dim_grid[0]):
-            for j in range(dim_grid[1]-1):
-                index1 = str((i,j))
-                index2 = str((i,j+1))
-                coef.append(J_right[i,j])
-                ops.append(qml.PauliZ(index1)@qml.PauliZ(index2))
-
-        for i in range(dim_grid[0]-1):
-            for j in range(dim_grid[1]):
-                index1 = str((i,j))
-                index2 = str((i+1,j))
-                coef.append(J_down[i,j])
-                ops.append(qml.PauliZ(index1)@qml.PauliZ(index2))
-
-        # Transverse field X terms
-        # Define the transverse field acting with the same strength in all qubits  of the grid
-        h_field = parameters.h_field
-
-        for i in range(dim_grid[0]):
-            for j in range(dim_grid[1]):
-                index = str((i,j))
-                coef.append(h_field)
-                ops.append(qml.PauliX(index))
 
 
     hamiltonian = qml.Hamiltonian(coef, ops)
@@ -397,8 +370,10 @@ def generate_training_set(dim_grid, hamiltonian_label, num_examples, observable_
     
     # Initialize Random Fourier Feature Map
     local_right_edges, local_down_edges = fourier_feature_map.get_local_edges(qubits, dim_grid, delta)      # Binary strings encoding the local edges
-    w = np.random.normal(0, 1, R)                                                                           # Random vector of ewights for Fourier feature map
+    l = np.sum(local_down_edges) + np.sum(local_down_edges)
+    w = np.random.normal(0, 1, R)                                                                           # Random vector of weights for Fourier feature map
     PhiX_fourier = np.zeros((num_examples, ((np.sum(local_right_edges) + np.sum(local_down_edges))*2*R)))   # Matrix of dimension num_examples x (number of local edges)*2R
+    
     
     # Generate feature maps and outputs for each examples
     for l in range(num_examples):
@@ -415,6 +390,7 @@ def generate_training_set(dim_grid, hamiltonian_label, num_examples, observable_
         # Obtain the random Fourier feature map
         Z = fourier_feature_map.generate_local_couplings(J_right, J_down, local_right_edges, local_down_edges)
         PhiX_fourier[l,:] = fourier_feature_map.random_fourier_feature_map(Z, w, gamma, R)
+
 
     return X, PhiX_quantum_diag, PhiX_quantum_VQE, PhiX_fourier, Y_diag, Y_VQE
 

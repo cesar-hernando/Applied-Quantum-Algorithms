@@ -146,6 +146,8 @@ def random_fourier_feature_map(Z, w, gamma, R):
                 phi[i*2*R+j] = np.sin(p*w[j//2]*z)
 
     return phi
+
+
     
 
 
