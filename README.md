@@ -11,7 +11,9 @@
  well the estimated ground state energies and observables match with the exact ones obtained by diagonalization, set 'mode' to 'A'. Furthermore, different 
  parameters such as the lattice size, number of examples and hyperparameters of different models can be changes in the parameters.py file.
 
- The file SA_VQE.py include the functions related to the VQE algorithm. The fourier_feature_mappy file contains the functions related to the classical
+ The file SA_VQE.py include the functions related to the VQE algorithm. IMPORTANT: in the end, I did not use the symmetry-adapted VQE but the hardware-efficient VQE, but I did not change the file name. I hope this comment is enough to avoid confusion.
+ 
+ The fourier_feature_mappy file contains the functions related to the classical
  LASSO model proposed in Ref. 3. Finally, the functions.py contains the rest of the functions to generate couplings, define hamiltonian and observble,
  calculate the ground state using numpy diagonalization, generating the training dataset, and defining the ML models.
 
