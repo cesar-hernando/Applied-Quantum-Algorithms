@@ -6,9 +6,9 @@
  observables and predict expectation values on ground states of a class of local Hamiltonians. For this, I will compare different methods:
  a quantum LASSO regression model that involves executing VQE; a LASSO regression that involves using a random Fourier feature map; and a Deep Neural Network.
 
- In order to train these models and compare their performance, you should set the variable 'mode' in main.py to 'B'. If you want to check how
- well the estimated ground state energies and observables match with the exact ones obtained by diagonalization, set 'mode' to 'A'. Furthermore, different 
- parameters such as the lattice size, number of examples and hyperparameters of different models can be changes in the parameters.py file.
+ In order to train these models and compare their performance, you should set the variable "mode" in main.py to 'B'. If you want to check how
+ well the estimated ground state energies and observables match with the exact ones obtained by diagonalization, set "mode" to 'A'. Furthermore, different 
+ parameters such as the lattice size, number of examples and hyperparameters of different models can be changed in the parameters.py file.
 
  The file SA_VQE.py include the functions related to the VQE algorithm. IMPORTANT: in the end, I did not use the symmetry-adapted VQE but the hardware-efficient VQE, but I did not change the file name. I hope this comment is enough to avoid confusion.
  
