@@ -2,8 +2,8 @@
  Predicting unknown observables on ground states
 
  In this project I will use different supervised learning methods to solve a quantum many body physics problem.
- Specifically, the task is to learn to predict from data expectation values of unknown
- observables and predict expectation values on ground states of a class of local Hamiltonians. For this, I will compare different methods:
+ Specifically, the task is to learn from data to predict ground state expectation values of unknown
+ observables for a class of local Hamiltonians. For this, I will compare different methods:
  a quantum LASSO regression model that involves executing VQE; a LASSO regression that involves using a random Fourier feature map; and a Deep Neural Network.
 
  In order to train these models and compare their performance, you should set the variable "mode" in main.py to 'B'. If you want to check how
